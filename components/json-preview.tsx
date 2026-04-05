@@ -232,19 +232,16 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
         {!error && data !== undefined && (
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="relative flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground transition-all hover:bg-accent"
           >
-            {copied ? (
-              <>
-                <Check className="size-3" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="size-3" />
-                Copy JSON
-              </>
-            )}
+            <span className={`flex items-center gap-1.5 transition-all duration-200 ${copied ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}>
+              <Copy className="size-3.5" />
+              Copy
+            </span>
+            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
+              <Check className="size-3.5" />
+              Copied!
+            </span>
           </button>
         )}
       </div>
