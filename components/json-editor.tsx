@@ -20,12 +20,12 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
   const lines = value.split("\n")
   const lineCount = lines.length
 
-  // Calculate which lines should be underlined based on highlightRange
-  const highlightedLines = useMemo(() => {
-    if (!highlightRange) return new Set<number>()
+  // Calculate per-line highlight ranges (start/end within each line)
+  const lineHighlights = useMemo(() => {
+    if (!highlightRange) return new Map<number, { start: number; end: number }>()
     
     const { start, end } = highlightRange
-    const lineSet = new Set<number>()
+    const highlightMap = new Map<number, { start: number; end: number }>()
     
     let charIndex = 0
     for (let i = 0; i < lines.length; i++) {
@@ -34,14 +34,37 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
       
       // Check if this line overlaps with the highlight range
       if (lineEnd >= start && lineStart < end) {
-        lineSet.add(i)
+        // Calculate the highlight start/end within this line
+        const highlightStartInLine = Math.max(0, start - lineStart)
+        const highlightEndInLine = Math.min(lines[i].length, end - lineStart)
+        highlightMap.set(i, { start: highlightStartInLine, end: highlightEndInLine })
       }
       
       charIndex = lineEnd + 1 // +1 for the newline character
     }
     
-    return lineSet
+    return highlightMap
   }, [highlightRange, lines])
+
+  // Helper to render a line with inline underline for the highlighted portion
+  const renderHighlightedLine = useCallback((line: string, lineIndex: number) => {
+    const highlight = lineHighlights.get(lineIndex)
+    if (!highlight) {
+      return <span className="invisible">{line || "\u00A0"}</span>
+    }
+    
+    const before = line.slice(0, highlight.start)
+    const highlighted = line.slice(highlight.start, highlight.end)
+    const after = line.slice(highlight.end)
+    
+    return (
+      <>
+        <span className="invisible">{before}</span>
+        <span className="border-b-2 border-yellow-500 bg-yellow-500/20">{highlighted}</span>
+        <span className="invisible">{after}</span>
+      </>
+    )
+  }, [lineHighlights])
 
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
@@ -194,7 +217,7 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
           className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
         >
           {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className={`px-2 ${highlightedLines.has(i) ? "bg-yellow-500/20" : ""}`}>
+            <div key={i + 1} className={`px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}>
               {i + 1}
             </div>
           ))}
@@ -207,15 +230,8 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
             aria-hidden="true"
           >
             {lines.map((line, i) => (
-              <div
-                key={i}
-                className={`whitespace-pre ${
-                  highlightedLines.has(i)
-                    ? "border-b-2 border-yellow-500 bg-yellow-500/10"
-                    : ""
-                }`}
-              >
-                {line || "\u00A0"}
+              <div key={i} className="whitespace-pre">
+                {renderHighlightedLine(line, i)}
               </div>
             ))}
           </div>
