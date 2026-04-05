@@ -221,13 +221,13 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
             </div>
           ))}
         </div>
-        <div className="relative min-h-0 flex-1 overflow-auto bg-card">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           {/* Syntax highlighted background */}
           <pre
             ref={highlightRef}
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre border-none bg-transparent p-4 font-mono text-sm leading-6 [&_.json-boolean]:text-orange-400 [&_.json-bracket]:text-muted-foreground [&_.json-null]:text-orange-400 [&_.json-number]:text-emerald-400 [&_.json-punctuation]:text-muted-foreground [&_.json-string]:text-sky-400"
-            dangerouslySetInnerHTML={{ __html: highlightedCode + "\n" || "&nbsp;" }}
+            className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words bg-card p-4 font-mono text-sm leading-6 [&_.json-boolean]:text-orange-400 [&_.json-bracket]:text-muted-foreground [&_.json-null]:text-orange-400 [&_.json-number]:text-emerald-400 [&_.json-punctuation]:text-muted-foreground [&_.json-string]:text-sky-400"
+            dangerouslySetInnerHTML={{ __html: highlightedCode || "&nbsp;" }}
           />
           {/* Transparent textarea for editing */}
           <textarea
@@ -236,8 +236,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             spellCheck={false}
-            wrap="off"
-            className="relative z-10 block min-h-full w-full resize-none whitespace-pre border-none bg-transparent p-4 font-mono text-sm leading-6 text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
+            className="relative z-10 min-h-full w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
             placeholder="Enter your JSON here..."
           />
         </div>
