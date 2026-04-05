@@ -110,11 +110,12 @@ export default function Home() {
         const stringContent = match[0].slice(1, -1) // Remove surrounding quotes
         
         // Strip HTML tags from the string content to match against selection
+        // HTML tags in JSON strings may have escaped quotes like: <font color=\"#C00000\">
         const strippedContent = stringContent
           .replace(/\\n/g, '\n')
           .replace(/\\r/g, '\r')
           .replace(/\\t/g, '\t')
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
+          .replace(/<[^>]*>/g, '') // Remove HTML tags (handles escaped quotes inside)
         
         const indexInStripped = strippedContent.indexOf(selectedText)
         if (indexInStripped !== -1) {
@@ -124,7 +125,7 @@ export default function Home() {
           let strippedIndex = 0
           
           while (strippedIndex < indexInStripped && originalIndex < stringContent.length) {
-            // Check for escaped newlines
+            // Check for escaped sequences
             if (stringContent.slice(originalIndex, originalIndex + 2) === '\\n') {
               originalIndex += 2
               strippedIndex += 1
@@ -135,13 +136,21 @@ export default function Home() {
               originalIndex += 2
               strippedIndex += 1
             } else if (stringContent[originalIndex] === '<') {
-              // Skip HTML tag
-              const tagEnd = stringContent.indexOf('>', originalIndex)
-              if (tagEnd !== -1) {
-                originalIndex = tagEnd + 1
-              } else {
-                originalIndex++
+              // Skip HTML tag - find the closing >
+              let tagEnd = originalIndex + 1
+              while (tagEnd < stringContent.length && stringContent[tagEnd] !== '>') {
+                // Handle escaped characters inside tags like \"
+                if (stringContent[tagEnd] === '\\' && tagEnd + 1 < stringContent.length) {
+                  tagEnd += 2
+                } else {
+                  tagEnd++
+                }
               }
+              originalIndex = tagEnd + 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\\"') {
+              // Escaped quote
+              originalIndex += 2
+              strippedIndex++
             } else {
               originalIndex++
               strippedIndex++
@@ -164,12 +173,19 @@ export default function Home() {
               endStrippedIndex += 1
             } else if (stringContent[endOriginalIndex] === '<') {
               // Skip HTML tag
-              const tagEnd = stringContent.indexOf('>', endOriginalIndex)
-              if (tagEnd !== -1) {
-                endOriginalIndex = tagEnd + 1
-              } else {
-                endOriginalIndex++
+              let tagEnd = endOriginalIndex + 1
+              while (tagEnd < stringContent.length && stringContent[tagEnd] !== '>') {
+                if (stringContent[tagEnd] === '\\' && tagEnd + 1 < stringContent.length) {
+                  tagEnd += 2
+                } else {
+                  tagEnd++
+                }
               }
+              endOriginalIndex = tagEnd + 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\\"') {
+              // Escaped quote
+              endOriginalIndex += 2
+              endStrippedIndex++
             } else {
               endOriginalIndex++
               endStrippedIndex++
