@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react"
 import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
+import { ResizablePanels } from "@/components/resizable-panels"
 import { Code, Eye, Braces, Download, Upload, FileText, Loader2, FileType } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -719,22 +720,24 @@ export default function Home() {
         )}
       </header>
 
-      {/* Main content */}
-      <main className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
-        {/* Editor Panel */}
-        <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
-          <div className="min-h-0 flex-1">
-            <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
-          </div>
-        </div>
-
-        {/* Preview Panel */}
-        <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1">
-            <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
-          </div>
-        </div>
-      </main>
+{/* Main content */}
+  <main className="flex min-h-0 flex-1">
+  <ResizablePanels
+    leftPanel={
+      <div className="min-h-0 flex-1">
+        <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
+      </div>
+    }
+    rightPanel={
+      <div className="min-h-0 flex-1">
+        <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
+      </div>
+    }
+    defaultLeftWidth={50}
+    minLeftWidth={25}
+    maxLeftWidth={75}
+  />
+  </main>
 
       {/* Status bar */}
       <footer className="flex items-center justify-between border-t border-border bg-sidebar px-4 py-1.5 text-xs text-muted-foreground">

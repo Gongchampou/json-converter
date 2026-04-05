@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useEffect, useState, useMemo } from "react"
+import { useCallback, useRef, useEffect, useState, useMemo, useLayoutEffect } from "react"
 import { Sparkles, Minimize2, Trash2, Copy, Check } from "lucide-react"
 import type { HighlightRange } from "@/app/page"
 
@@ -9,16 +9,52 @@ interface JsonEditorProps {
   onChange: (value: string) => void
   error?: string | null
   highlightRange?: HighlightRange | null
+  onSelection?: (selectedText: string) => void
 }
 
-export function JsonEditor({ value, onChange, error, highlightRange }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, highlightRange, onSelection }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
+  const [lineHeights, setLineHeights] = useState<number[]>([])
+  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null)
 
   const lines = value.split("\n")
   const lineCount = lines.length
+
+  // Measure the actual rendered height of each line (accounting for wrapping)
+  const measureLineHeights = useCallback(() => {
+    if (!measureRef.current) return
+    
+    const measureDiv = measureRef.current
+    const children = measureDiv.children
+    const heights: number[] = []
+    
+    for (let i = 0; i < children.length; i++) {
+      heights.push((children[i] as HTMLElement).offsetHeight)
+    }
+    
+    setLineHeights(heights)
+  }, [])
+
+  useLayoutEffect(() => {
+    measureLineHeights()
+  }, [value, lines.length, measureLineHeights])
+
+  // Re-measure on resize
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver(() => {
+      measureLineHeights()
+    })
+    
+    if (measureRef.current) {
+      resizeObserver.observe(measureRef.current)
+    }
+    
+    return () => resizeObserver.disconnect()
+  }, [measureLineHeights])
 
   // Calculate per-line highlight ranges (start/end within each line)
   const lineHighlights = useMemo(() => {
@@ -43,19 +79,48 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
       charIndex = lineEnd + 1 // +1 for the newline character
     }
     
-    return highlightMap
+return highlightMap
   }, [highlightRange, lines])
 
+  // Calculate selection highlights from editor's own selection (selectionRange)
+  const selectionHighlights = useMemo(() => {
+    const highlightMap = new Map<number, { start: number; end: number }>()
+    if (!selectionRange) return highlightMap
+    
+    const { start, end } = selectionRange
+    let charIndex = 0
+    for (let i = 0; i < lines.length; i++) {
+      const lineStart = charIndex
+      const lineEnd = charIndex + lines[i].length
+      
+      if (lineEnd >= start && lineStart < end) {
+        const highlightStartInLine = Math.max(0, start - lineStart)
+        const highlightEndInLine = Math.min(lines[i].length, end - lineStart)
+        highlightMap.set(i, { start: highlightStartInLine, end: highlightEndInLine })
+      }
+      
+      charIndex = lineEnd + 1
+    }
+    
+    return highlightMap
+  }, [selectionRange, lines])
+  
   // Helper to render a line with inline underline for the highlighted portion
   const renderHighlightedLine = useCallback((line: string, lineIndex: number) => {
+    // Check for preview-to-editor highlight first
     const highlight = lineHighlights.get(lineIndex)
-    if (!highlight) {
+    // Then check for editor's own selection highlight
+    const selection = selectionHighlights.get(lineIndex)
+    
+    const activeHighlight = highlight || selection
+    
+    if (!activeHighlight) {
       return <span className="invisible">{line || "\u00A0"}</span>
     }
     
-    const before = line.slice(0, highlight.start)
-    const highlighted = line.slice(highlight.start, highlight.end)
-    const after = line.slice(highlight.end)
+    const before = line.slice(0, activeHighlight.start)
+    const highlighted = line.slice(activeHighlight.start, activeHighlight.end)
+    const after = line.slice(activeHighlight.end)
     
     return (
       <>
@@ -64,7 +129,7 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
         <span className="invisible">{after}</span>
       </>
     )
-  }, [lineHighlights])
+  }, [lineHighlights, selectionHighlights])
 
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
@@ -73,6 +138,10 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
     if (textareaRef.current && highlightRef.current) {
       highlightRef.current.scrollTop = textareaRef.current.scrollTop
       highlightRef.current.scrollLeft = textareaRef.current.scrollLeft
+    }
+    if (textareaRef.current && measureRef.current) {
+      measureRef.current.scrollTop = textareaRef.current.scrollTop
+      measureRef.current.scrollLeft = textareaRef.current.scrollLeft
     }
   }, [])
 
@@ -83,6 +152,40 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
       return () => textarea.removeEventListener("scroll", handleScroll)
     }
   }, [handleScroll])
+
+  // Handle text selection in the editor
+  const handleTextSelect = useCallback(() => {
+    // Use setTimeout to ensure the selection is complete
+    setTimeout(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      
+      if (start !== end) {
+        // Store the exact selection range for underlining
+        setSelectionRange({ start, end })
+        const selectedText = value.substring(start, end).trim()
+        onSelection?.(selectedText)
+      } else {
+        setSelectionRange(null)
+      }
+    }, 10)
+  }, [onSelection, value])
+
+  // Clear selection when clicking outside the textarea
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (textareaRef.current && !textareaRef.current.contains(e.target as Node)) {
+        setSelectionRange(null)
+        onSelection?.("")
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [onSelection])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab") {
@@ -214,23 +317,39 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
       <div className="relative flex min-h-0 flex-1">
         <div
           ref={lineNumbersRef}
-          className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
+          className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs text-muted-foreground"
         >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className={`px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}>
-              {i + 1}
+          {lines.map((_, i) => (
+            <div 
+              key={i + 1} 
+              className={`flex items-start justify-end px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}
+              style={{ height: lineHeights[i] || 24 }}
+            >
+              <span className="leading-6">{i + 1}</span>
             </div>
           ))}
         </div>
         <div className="relative min-h-0 flex-1 bg-card">
-          {/* Highlight overlay - shows underlines for selected text */}
+          {/* Hidden measurement div - measures actual line heights including wrapping */}
           <div
-            ref={highlightRef}
-            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6"
+            ref={measureRef}
+            className="pointer-events-none invisible absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
             aria-hidden="true"
           >
             {lines.map((line, i) => (
-              <div key={i} className="whitespace-pre">
+              <div key={i} className="whitespace-pre-wrap break-words">
+                {line || "\u00A0"}
+              </div>
+            ))}
+          </div>
+          {/* Highlight overlay - shows underlines for selected text */}
+          <div
+            ref={highlightRef}
+            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
+            aria-hidden="true"
+          >
+            {lines.map((line, i) => (
+              <div key={i} className="whitespace-pre-wrap break-words">
                 {renderHighlightedLine(line, i)}
               </div>
             ))}
@@ -239,9 +358,11 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
             ref={textareaRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            spellCheck={false}
-            className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
+onKeyDown={handleKeyDown}
+  onMouseUp={handleTextSelect}
+  onSelect={handleTextSelect}
+  spellCheck={false}
+            className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground break-words whitespace-pre-wrap word-wrap ${
               !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
             placeholder="Enter your JSON here..."
