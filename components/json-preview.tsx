@@ -1,90 +1,181 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Copy, Check } from "lucide-react"
+import { Copy, Check, FileText } from "lucide-react"
 
 interface JsonPreviewProps {
   data: unknown
   error?: string | null
 }
 
-function highlightJson(json: string): React.ReactNode[] {
-  const lines = json.split("\n")
-  
-  return lines.map((line, lineIndex) => {
-    const tokens: React.ReactNode[] = []
-    let i = 0
-    let tokenIndex = 0
-    
-    while (i < line.length) {
-      // Match whitespace
-      const wsMatch = line.slice(i).match(/^(\s+)/)
-      if (wsMatch) {
-        tokens.push(<span key={tokenIndex++}>{wsMatch[1]}</span>)
-        i += wsMatch[1].length
-        continue
-      }
-      
-      // Match string (key or value)
-      const stringMatch = line.slice(i).match(/^"([^"\\]|\\.)*"/)
-      if (stringMatch) {
-        const str = stringMatch[0]
-        // Check if it's a key (followed by colon)
-        const afterString = line.slice(i + str.length)
-        if (afterString.match(/^\s*:/)) {
-          tokens.push(
-            <span key={tokenIndex++} className="text-sky-400">{str}</span>
-          )
-        } else {
-          tokens.push(
-            <span key={tokenIndex++} className="text-amber-300">{str}</span>
+function formatKey(key: string): string {
+  // Convert camelCase or snake_case to Title Case with spaces
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim()
+}
+
+function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  if (value === null) {
+    return <span className="italic text-muted-foreground">None</span>
+  }
+
+  if (typeof value === "boolean") {
+    return (
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+          value
+            ? "bg-emerald-500/20 text-emerald-400"
+            : "bg-red-500/20 text-red-400"
+        }`}
+      >
+        {value ? "Yes" : "No"}
+      </span>
+    )
+  }
+
+  if (typeof value === "number") {
+    return <span className="font-medium text-sky-400">{value.toLocaleString()}</span>
+  }
+
+  if (typeof value === "string") {
+    // Check if it's a URL
+    if (value.match(/^https?:\/\//)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80"
+        >
+          {value}
+        </a>
+      )
+    }
+    // Check if it's an email
+    if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      return (
+        <a
+          href={`mailto:${value}`}
+          className="text-primary underline underline-offset-2 hover:text-primary/80"
+        >
+          {value}
+        </a>
+      )
+    }
+    // Check if it looks like a date
+    if (value.match(/^\d{4}-\d{2}-\d{2}/) || value.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+      try {
+        const date = new Date(value)
+        if (!isNaN(date.getTime())) {
+          return (
+            <span className="text-foreground">
+              {date.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
           )
         }
-        i += str.length
-        continue
+      } catch {
+        // Not a valid date, render as string
       }
-      
-      // Match number
-      const numMatch = line.slice(i).match(/^-?\d+\.?\d*([eE][+-]?\d+)?/)
-      if (numMatch) {
-        tokens.push(
-          <span key={tokenIndex++} className="text-emerald-400">{numMatch[0]}</span>
-        )
-        i += numMatch[0].length
-        continue
-      }
-      
-      // Match boolean and null
-      const boolNullMatch = line.slice(i).match(/^(true|false|null)/)
-      if (boolNullMatch) {
-        tokens.push(
-          <span key={tokenIndex++} className="text-orange-400">{boolNullMatch[0]}</span>
-        )
-        i += boolNullMatch[0].length
-        continue
-      }
-      
-      // Match brackets, braces, colons, commas
-      const punctMatch = line.slice(i).match(/^[{}\[\]:,]/)
-      if (punctMatch) {
-        tokens.push(
-          <span key={tokenIndex++} className="text-foreground">{punctMatch[0]}</span>
-        )
-        i += 1
-        continue
-      }
-      
-      // Fallback: single character
-      tokens.push(<span key={tokenIndex++}>{line[i]}</span>)
-      i++
     }
-    
+    return <span className="text-foreground">{value}</span>
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <span className="italic text-muted-foreground">Empty list</span>
+    }
+
+    // Check if it's an array of primitives
+    const allPrimitives = value.every(
+      (item) =>
+        typeof item === "string" ||
+        typeof item === "number" ||
+        typeof item === "boolean"
+    )
+
+    if (allPrimitives) {
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((item, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center rounded-md bg-accent px-2 py-1 text-sm"
+            >
+              {String(item)}
+            </span>
+          ))}
+        </div>
+      )
+    }
+
+    // Array of objects - render as cards
     return (
-      <div key={lineIndex} className="whitespace-pre">
-        {tokens.length > 0 ? tokens : " "}
+      <div className="mt-2 space-y-3">
+        {value.map((item, index) => (
+          <div
+            key={index}
+            className="rounded-lg border border-border bg-background p-4"
+          >
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              Item {index + 1}
+            </div>
+            <RenderValue value={item} depth={depth + 1} />
+          </div>
+        ))}
       </div>
     )
-  })
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) {
+      return <span className="italic text-muted-foreground">Empty object</span>
+    }
+
+    return (
+      <div className={`space-y-3 ${depth > 0 ? "" : ""}`}>
+        {entries.map(([key, val]) => {
+          const isComplexValue =
+            typeof val === "object" && val !== null && Object.keys(val).length > 0
+
+          return (
+            <div key={key} className={isComplexValue ? "space-y-2" : ""}>
+              <div
+                className={`${
+                  isComplexValue
+                    ? "flex flex-col gap-1"
+                    : "flex items-start justify-between gap-4"
+                }`}
+              >
+                <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                  {formatKey(key)}
+                </span>
+                {!isComplexValue && (
+                  <div className="text-right">
+                    <RenderValue value={val} depth={depth + 1} />
+                  </div>
+                )}
+              </div>
+              {isComplexValue && (
+                <div className="rounded-lg border border-border bg-card/50 p-4">
+                  <RenderValue value={val} depth={depth + 1} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  return <span>{String(value)}</span>
 }
 
 export function JsonPreview({ data, error }: JsonPreviewProps) {
@@ -98,16 +189,6 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
       return ""
     }
   }, [data])
-
-  const lines = useMemo(() => {
-    if (!formattedJson) return []
-    return formattedJson.split("\n")
-  }, [formattedJson])
-
-  const highlightedContent = useMemo(() => {
-    if (!formattedJson) return null
-    return highlightJson(formattedJson)
-  }, [formattedJson])
 
   const handleCopy = async () => {
     try {
@@ -123,7 +204,8 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Preview</span>
+          <FileText className="size-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Document Preview</span>
           {!error && data !== undefined && (
             <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
               Valid JSON
@@ -143,13 +225,13 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
             ) : (
               <>
                 <Copy className="size-3" />
-                Copy
+                Copy JSON
               </>
             )}
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto bg-card">
+      <div className="flex-1 overflow-auto">
         {error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="rounded-full bg-destructive/20 p-3">
@@ -173,20 +255,24 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
             </div>
           </div>
         ) : data === undefined ? (
-          <div className="flex h-full items-center justify-center p-4 text-muted-foreground">
-            Enter JSON in the editor to see preview
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <FileText className="size-8 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">No Data to Preview</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Paste or type JSON in the editor to see it displayed here
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="flex h-full font-mono text-sm leading-6">
-            {/* Line numbers */}
-            <div className="sticky left-0 select-none border-r border-border bg-sidebar px-3 py-4 text-right text-muted-foreground">
-              {lines.map((_, index) => (
-                <div key={index}>{index + 1}</div>
-              ))}
-            </div>
-            {/* Code content */}
-            <div className="flex-1 overflow-x-auto p-4">
-              {highlightedContent}
+          <div className="bg-card">
+            {/* Document container - like a PDF page */}
+            <div className="mx-auto max-w-3xl p-8">
+              <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
+                <RenderValue value={data} />
+              </div>
             </div>
           </div>
         )}
