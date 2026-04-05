@@ -6,6 +6,33 @@ import { Copy, Check, FileText } from "lucide-react"
 // Context to pass highlight text to nested components
 const HighlightContext = createContext<string | null>(null)
 
+// Helper function to highlight text within HTML content
+function HighlightedHtml({ html }: { html: string }) {
+  const highlightText = useContext(HighlightContext)
+  
+  const highlightedHtml = useMemo(() => {
+    if (!highlightText || highlightText.length < 2) {
+      return html
+    }
+    
+    // Escape special regex characters in the search text
+    const escapedSearch = highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    
+    // Create a regex that matches the text but not inside HTML tags
+    const regex = new RegExp(`(${escapedSearch})(?![^<]*>)`, 'gi')
+    
+    // Replace matches with highlighted version
+    return html.replace(regex, '<mark class="border-b-2 border-yellow-500 bg-yellow-500/20">$1</mark>')
+  }, [html, highlightText])
+  
+  return (
+    <div 
+      className="prose dark:prose-invert max-w-none text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_b]:text-foreground [&_i]:italic [&_u]:underline [&_mark]:text-inherit"
+      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+    />
+  )
+}
+
 // Helper function to highlight text matches
 function HighlightedText({ text }: { text: string }) {
   const highlightText = useContext(HighlightContext)
@@ -125,13 +152,14 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
       try {
         const date = new Date(processedValue)
         if (!isNaN(date.getTime())) {
+          const formattedDate = date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
           return (
             <span className="text-foreground">
-              {date.toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              <HighlightedText text={formattedDate} />
             </span>
           )
         }
@@ -142,10 +170,7 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
     // Check if it contains HTML tags - render as HTML document
     if (processedValue.match(/<[^>]+>/)) {
       return (
-        <div 
-          className="prose dark:prose-invert max-w-none text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_b]:text-foreground [&_i]:italic [&_u]:underline"
-          dangerouslySetInnerHTML={{ __html: processedValue }}
-        />
+        <HighlightedHtml html={processedValue} />
       )
     }
 // Check if it's a long text (multiline) - render as paragraph
@@ -219,9 +244,9 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
 
           return (
             <div key={key} className="space-y-1">
-              <span className="block text-sm font-medium text-muted-foreground">
-                {formatKey(key)}
-              </span>
+<span className="block text-sm font-medium text-muted-foreground">
+  <HighlightedText text={formatKey(key)} />
+  </span>
               {isComplexValue ? (
                 <div className="rounded-lg border border-border bg-card/50 p-4">
                   <RenderValue value={val} depth={depth + 1} />
