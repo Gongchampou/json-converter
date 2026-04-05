@@ -266,11 +266,11 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
           {/* Highlight overlay - shows underlines for selected text */}
           <div
             ref={highlightRef}
-            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6"
+            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
             aria-hidden="true"
           >
             {lines.map((line, i) => (
-              <div key={i} className="whitespace-pre">
+              <div key={i} className="whitespace-pre-wrap break-words">
                 {renderHighlightedLine(line, i)}
               </div>
             ))}
@@ -283,7 +283,7 @@ onKeyDown={handleKeyDown}
   onMouseUp={handleTextSelect}
   onSelect={handleTextSelect}
   spellCheck={false}
-            className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
+            className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground break-words whitespace-pre-wrap word-wrap ${
               !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
             placeholder="Enter your JSON here..."
