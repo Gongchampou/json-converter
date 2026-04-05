@@ -101,6 +101,88 @@ export default function Home() {
       }
     }
     
+    // Strategy 5: Handle HTML content - the JSON may contain HTML tags that are stripped in preview
+    // We need to find where the selected text appears when ignoring HTML tags
+    if (start === -1) {
+      const stringValueRegex = /"(?:[^"\\]|\\.)*"/g
+      let match
+      while ((match = stringValueRegex.exec(jsonText)) !== null) {
+        const stringContent = match[0].slice(1, -1) // Remove surrounding quotes
+        
+        // Strip HTML tags from the string content to match against selection
+        const strippedContent = stringContent
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/<[^>]*>/g, '') // Remove HTML tags
+        
+        const indexInStripped = strippedContent.indexOf(selectedText)
+        if (indexInStripped !== -1) {
+          // Found it! Now we need to find the corresponding position in the original string
+          // by counting characters while skipping HTML tags
+          let originalIndex = 0
+          let strippedIndex = 0
+          
+          while (strippedIndex < indexInStripped && originalIndex < stringContent.length) {
+            // Check for escaped newlines
+            if (stringContent.slice(originalIndex, originalIndex + 2) === '\\n') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\r') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\t') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent[originalIndex] === '<') {
+              // Skip HTML tag
+              const tagEnd = stringContent.indexOf('>', originalIndex)
+              if (tagEnd !== -1) {
+                originalIndex = tagEnd + 1
+              } else {
+                originalIndex++
+              }
+            } else {
+              originalIndex++
+              strippedIndex++
+            }
+          }
+          
+          // Now find the end position
+          let endOriginalIndex = originalIndex
+          let endStrippedIndex = strippedIndex
+          
+          while (endStrippedIndex < strippedIndex + selectedText.length && endOriginalIndex < stringContent.length) {
+            if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\n') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\r') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\t') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent[endOriginalIndex] === '<') {
+              // Skip HTML tag
+              const tagEnd = stringContent.indexOf('>', endOriginalIndex)
+              if (tagEnd !== -1) {
+                endOriginalIndex = tagEnd + 1
+              } else {
+                endOriginalIndex++
+              }
+            } else {
+              endOriginalIndex++
+              endStrippedIndex++
+            }
+          }
+          
+          start = match.index + 1 + originalIndex // +1 for opening quote
+          matchLength = endOriginalIndex - originalIndex
+          break
+        }
+      }
+    }
+    
     if (start !== -1 && matchLength > 0) {
       setHighlightRange({ start, end: start + matchLength })
     } else {
