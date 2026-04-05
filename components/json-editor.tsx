@@ -85,6 +85,7 @@ return highlightMap
   // Calculate selection highlights from editor's own selection (selectionRange)
   const selectionHighlights = useMemo(() => {
     const highlightMap = new Map<number, { start: number; end: number }>()
+    console.log("[v0] selectionHighlights - selectionRange:", selectionRange)
     if (!selectionRange) return highlightMap
     
     const { start, end } = selectionRange
@@ -96,12 +97,14 @@ return highlightMap
       if (lineEnd >= start && lineStart < end) {
         const highlightStartInLine = Math.max(0, start - lineStart)
         const highlightEndInLine = Math.min(lines[i].length, end - lineStart)
+        console.log("[v0] Adding highlight to line", i, ":", { start: highlightStartInLine, end: highlightEndInLine })
         highlightMap.set(i, { start: highlightStartInLine, end: highlightEndInLine })
       }
       
       charIndex = lineEnd + 1
     }
     
+    console.log("[v0] selectionHighlights size:", highlightMap.size)
     return highlightMap
   }, [selectionRange, lines])
   
@@ -163,8 +166,11 @@ return highlightMap
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
       
+      console.log("[v0] handleTextSelect - start:", start, "end:", end)
+      
       if (start !== end) {
         // Store the exact selection range for underlining
+        console.log("[v0] Setting selectionRange:", { start, end })
         setSelectionRange({ start, end })
         const selectedText = value.substring(start, end).trim()
         onSelection?.(selectedText)
