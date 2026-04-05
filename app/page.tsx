@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
 import { Code, Eye, Braces, Download, Upload, FileText, Loader2, FileType } from "lucide-react"
@@ -26,10 +26,185 @@ const SAMPLE_JSON = `{
   "downloads": 12500
 }`
 
+export interface HighlightRange {
+  start: number
+  end: number
+}
+
 export default function Home() {
   const [jsonText, setJsonText] = useState(SAMPLE_JSON)
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState<string | null>(null)
+  const [highlightRange, setHighlightRange] = useState<HighlightRange | null>(null)
+
+  // Callback when text is selected in the preview
+  const handlePreviewSelection = useCallback((selectedText: string) => {
+    if (!selectedText) {
+      setHighlightRange(null)
+      return
+    }
+    
+    // Escape the selected text to match JSON source format
+    // In JSON, newlines are stored as \n (literal backslash + n), tabs as \t, etc.
+    const escapeForJson = (text: string) => {
+      return text
+        .replace(/\\/g, '\\\\')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+    }
+    
+    const escapedText = escapeForJson(selectedText)
+    
+    // Try multiple matching strategies
+    let start = -1
+    let matchLength = 0
+    
+    // Strategy 1: Direct match (works for keys, numbers, booleans, etc.)
+    start = jsonText.indexOf(selectedText)
+    if (start !== -1) {
+      matchLength = selectedText.length
+    }
+    
+    // Strategy 2: Try with escaped characters (for content inside JSON strings)
+    if (start === -1) {
+      start = jsonText.indexOf(escapedText)
+      if (start !== -1) {
+        matchLength = escapedText.length
+      }
+    }
+    
+    // Strategy 3: Try wrapping in quotes (for complete JSON string values)
+    if (start === -1) {
+      const quotedText = `"${escapedText}"`
+      const quotedStart = jsonText.indexOf(quotedText)
+      if (quotedStart !== -1) {
+        // Highlight just the value content, not the quotes
+        start = quotedStart + 1
+        matchLength = escapedText.length
+      }
+    }
+    
+    // Strategy 4: Search for partial matches - scan through all string values in JSON
+    if (start === -1) {
+      // Find all JSON string values and search within each
+      const stringValueRegex = /"(?:[^"\\]|\\.)*"/g
+      let match
+      while ((match = stringValueRegex.exec(jsonText)) !== null) {
+        const stringContent = match[0].slice(1, -1) // Remove surrounding quotes
+        const indexInString = stringContent.indexOf(escapedText)
+        if (indexInString !== -1) {
+          start = match.index + 1 + indexInString // +1 for opening quote
+          matchLength = escapedText.length
+          break
+        }
+      }
+    }
+    
+    // Strategy 5: Handle HTML content - the JSON may contain HTML tags that are stripped in preview
+    // We need to find where the selected text appears when ignoring HTML tags
+    if (start === -1) {
+      const stringValueRegex = /"(?:[^"\\]|\\.)*"/g
+      let match
+      while ((match = stringValueRegex.exec(jsonText)) !== null) {
+        const stringContent = match[0].slice(1, -1) // Remove surrounding quotes
+        
+        // Strip HTML tags from the string content to match against selection
+        // HTML tags in JSON strings may have escaped quotes like: <font color=\"#C00000\">
+        const strippedContent = stringContent
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/<[^>]*>/g, '') // Remove HTML tags (handles escaped quotes inside)
+        
+        const indexInStripped = strippedContent.indexOf(selectedText)
+        if (indexInStripped !== -1) {
+          // Found it! Now we need to find the corresponding position in the original string
+          // by counting characters while skipping HTML tags
+          let originalIndex = 0
+          let strippedIndex = 0
+          
+          while (strippedIndex < indexInStripped && originalIndex < stringContent.length) {
+            // Check for escaped sequences
+            if (stringContent.slice(originalIndex, originalIndex + 2) === '\\n') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\r') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\t') {
+              originalIndex += 2
+              strippedIndex += 1
+            } else if (stringContent[originalIndex] === '<') {
+              // Skip HTML tag - find the closing >
+              let tagEnd = originalIndex + 1
+              while (tagEnd < stringContent.length && stringContent[tagEnd] !== '>') {
+                // Handle escaped characters inside tags like \"
+                if (stringContent[tagEnd] === '\\' && tagEnd + 1 < stringContent.length) {
+                  tagEnd += 2
+                } else {
+                  tagEnd++
+                }
+              }
+              originalIndex = tagEnd + 1
+            } else if (stringContent.slice(originalIndex, originalIndex + 2) === '\\\"') {
+              // Escaped quote
+              originalIndex += 2
+              strippedIndex++
+            } else {
+              originalIndex++
+              strippedIndex++
+            }
+          }
+          
+          // Now find the end position
+          let endOriginalIndex = originalIndex
+          let endStrippedIndex = strippedIndex
+          
+          while (endStrippedIndex < strippedIndex + selectedText.length && endOriginalIndex < stringContent.length) {
+            if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\n') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\r') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\t') {
+              endOriginalIndex += 2
+              endStrippedIndex += 1
+            } else if (stringContent[endOriginalIndex] === '<') {
+              // Skip HTML tag
+              let tagEnd = endOriginalIndex + 1
+              while (tagEnd < stringContent.length && stringContent[tagEnd] !== '>') {
+                if (stringContent[tagEnd] === '\\' && tagEnd + 1 < stringContent.length) {
+                  tagEnd += 2
+                } else {
+                  tagEnd++
+                }
+              }
+              endOriginalIndex = tagEnd + 1
+            } else if (stringContent.slice(endOriginalIndex, endOriginalIndex + 2) === '\\\"') {
+              // Escaped quote
+              endOriginalIndex += 2
+              endStrippedIndex++
+            } else {
+              endOriginalIndex++
+              endStrippedIndex++
+            }
+          }
+          
+          start = match.index + 1 + originalIndex // +1 for opening quote
+          matchLength = endOriginalIndex - originalIndex
+          break
+        }
+      }
+    }
+    
+    if (start !== -1 && matchLength > 0) {
+      setHighlightRange({ start, end: start + matchLength })
+    } else {
+      setHighlightRange(null)
+    }
+  }, [jsonText])
 
   const { parsedJson, error } = useMemo(() => {
     if (!jsonText.trim()) {
@@ -549,14 +724,14 @@ export default function Home() {
         {/* Editor Panel */}
         <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
           <div className="min-h-0 flex-1">
-            <JsonEditor value={jsonText} onChange={setJsonText} error={error} />
+            <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
           </div>
         </div>
 
         {/* Preview Panel */}
         <div className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1">
-            <JsonPreview data={parsedJson} error={error} />
+            <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
           </div>
         </div>
       </main>

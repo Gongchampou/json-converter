@@ -1,25 +1,78 @@
 "use client"
 
-import { useCallback, useRef, useEffect, useState } from "react"
+import { useCallback, useRef, useEffect, useState, useMemo } from "react"
 import { Sparkles, Minimize2, Trash2, Copy, Check } from "lucide-react"
+import type { HighlightRange } from "@/app/page"
 
 interface JsonEditorProps {
   value: string
   onChange: (value: string) => void
   error?: string | null
+  highlightRange?: HighlightRange | null
 }
 
-export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, highlightRange }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
   const lines = value.split("\n")
   const lineCount = lines.length
 
+  // Calculate per-line highlight ranges (start/end within each line)
+  const lineHighlights = useMemo(() => {
+    if (!highlightRange) return new Map<number, { start: number; end: number }>()
+    
+    const { start, end } = highlightRange
+    const highlightMap = new Map<number, { start: number; end: number }>()
+    
+    let charIndex = 0
+    for (let i = 0; i < lines.length; i++) {
+      const lineStart = charIndex
+      const lineEnd = charIndex + lines[i].length
+      
+      // Check if this line overlaps with the highlight range
+      if (lineEnd >= start && lineStart < end) {
+        // Calculate the highlight start/end within this line
+        const highlightStartInLine = Math.max(0, start - lineStart)
+        const highlightEndInLine = Math.min(lines[i].length, end - lineStart)
+        highlightMap.set(i, { start: highlightStartInLine, end: highlightEndInLine })
+      }
+      
+      charIndex = lineEnd + 1 // +1 for the newline character
+    }
+    
+    return highlightMap
+  }, [highlightRange, lines])
+
+  // Helper to render a line with inline underline for the highlighted portion
+  const renderHighlightedLine = useCallback((line: string, lineIndex: number) => {
+    const highlight = lineHighlights.get(lineIndex)
+    if (!highlight) {
+      return <span className="invisible">{line || "\u00A0"}</span>
+    }
+    
+    const before = line.slice(0, highlight.start)
+    const highlighted = line.slice(highlight.start, highlight.end)
+    const after = line.slice(highlight.end)
+    
+    return (
+      <>
+        <span className="invisible">{before}</span>
+        <span className="border-b-2 border-yellow-500 bg-yellow-500/20">{highlighted}</span>
+        <span className="invisible">{after}</span>
+      </>
+    )
+  }, [lineHighlights])
+
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop
+    }
+    if (textareaRef.current && highlightRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop
+      highlightRef.current.scrollLeft = textareaRef.current.scrollLeft
     }
   }, [])
 
@@ -164,22 +217,36 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
         >
           {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className="px-2">
+            <div key={i + 1} className={`px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}>
               {i + 1}
             </div>
           ))}
         </div>
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          spellCheck={false}
-          className={`min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
-            !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-          }`}
-          placeholder="Enter your JSON here..."
-        />
+        <div className="relative min-h-0 flex-1 bg-card">
+          {/* Highlight overlay - shows underlines for selected text */}
+          <div
+            ref={highlightRef}
+            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6"
+            aria-hidden="true"
+          >
+            {lines.map((line, i) => (
+              <div key={i} className="whitespace-pre">
+                {renderHighlightedLine(line, i)}
+              </div>
+            ))}
+          </div>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            spellCheck={false}
+            className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
+              !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+            }`}
+            placeholder="Enter your JSON here..."
+          />
+        </div>
       </div>
     </div>
   )
