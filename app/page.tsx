@@ -5,6 +5,7 @@ import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
 import { Code, Eye, Braces, Download, Upload, FileText, Loader2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { convertPdfToJson } from "./actions/convert-pdf"
 
 const SAMPLE_JSON = `{
   "name": "JSON Editor",
@@ -114,81 +115,24 @@ export default function Home() {
         setConvertError(null)
         
         try {
-          // Load PDF.js from unpkg CDN dynamically (more reliable)
-          const PDFJS_VERSION = '3.11.174'
-          
-          // Define window type for PDF.js
-          type PDFJSWindow = Window & typeof globalThis & { 
-            pdfjsLib?: {
-              GlobalWorkerOptions: { workerSrc: string }
-              getDocument: (options: { data: ArrayBuffer }) => { 
-                promise: Promise<{
-                  numPages: number
-                  getPage: (num: number) => Promise<{
-                    getTextContent: () => Promise<{ items: Array<{ str?: string }> }>
-                  }>
-                }>
-              }
-            }
-          }
-          
-          const win = window as PDFJSWindow
-          
-          // Load the library if not already loaded
-          if (!win.pdfjsLib) {
-            await new Promise<void>((resolve, reject) => {
-              const script = document.createElement('script')
-              script.src = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`
-              script.async = true
-              script.onload = () => {
-                if (win.pdfjsLib) {
-                  win.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`
-                  resolve()
-                } else {
-                  reject(new Error('PDF.js library not found after loading'))
-                }
-              }
-              script.onerror = () => reject(new Error('Failed to load PDF.js library'))
-              document.head.appendChild(script)
-            })
-          }
-          
-          const pdfjsLib = win.pdfjsLib!
-          
-          // Read file as ArrayBuffer
+          // Convert file to base64
           const arrayBuffer = await file.arrayBuffer()
+          const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce(
+              (data, byte) => data + String.fromCharCode(byte),
+              ''
+            )
+          )
           
-          // Load the PDF document
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+          // Call server action to convert PDF with AI
+          const result = await convertPdfToJson(base64, file.name)
           
-          // Extract text from all pages
-          let fullText = ''
-          
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i)
-            const textContent = await page.getTextContent()
-            
-            // Extract text items and join them
-            const pageText = textContent.items
-              .map((item) => item.str || '')
-              .join(' ')
-            
-            fullText += pageText
-            
-            // Add newline between pages
-            if (i < pdf.numPages) {
-              fullText += '\\n\\n'
-            }
+          if (result.success && result.data) {
+            setJsonText(JSON.stringify(result.data, null, 2))
+          } else {
+            setConvertError(result.error || 'Failed to convert PDF')
           }
-          
-          // Create simple JSON with just content field
-          const jsonData = {
-            content: fullText.trim()
-          }
-          
-          setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
-          console.log('[v0] PDF conversion error:', err)
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
         } finally {
           setIsConverting(false)
