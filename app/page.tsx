@@ -167,8 +167,8 @@ export default function Home() {
           const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
           
           let fullText = ''
-          let currentBoldText = ''
-          let inBold = false
+          let currentStyledText = ''
+          let currentStyle = { bold: false, italic: false, fontSize: 0 }
           
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i)
@@ -176,6 +176,24 @@ export default function Home() {
             
             let lastY: number | null = null
             let lastX: number | null = null
+            
+            // Helper to flush current styled text
+            const flushStyledText = () => {
+              if (!currentStyledText) return
+              
+              const styles: string[] = []
+              if (currentStyle.bold) styles.push('font-weight:bold')
+              if (currentStyle.italic) styles.push('font-style:italic')
+              if (currentStyle.fontSize > 14) styles.push(`font-size:${Math.round(currentStyle.fontSize)}px`)
+              
+              if (styles.length > 0) {
+                const tag = currentStyle.bold ? 'b' : 'span'
+                fullText += `<${tag} style="${styles.join(';')};">${currentStyledText}</${tag}>`
+              } else {
+                fullText += currentStyledText
+              }
+              currentStyledText = ''
+            }
             
             for (const item of textContent.items) {
               const text = item.str
@@ -195,12 +213,7 @@ export default function Home() {
               
               // Check for line break
               if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 0.8) {
-                // Close any open bold tag before line break
-                if (inBold && currentBoldText) {
-                  fullText += `<b>${currentBoldText}</b>`
-                  currentBoldText = ''
-                  inBold = false
-                }
+                flushStyledText()
                 
                 // Double line break for larger gaps (paragraph)
                 if (Math.abs(currentY - lastY) > fontSize * 2) {
@@ -209,49 +222,30 @@ export default function Home() {
                   fullText += '\n'
                 }
               } else if (lastX !== null && currentX < lastX - 50) {
-                // New line detected by X position reset
-                if (inBold && currentBoldText) {
-                  fullText += `<b>${currentBoldText}</b>`
-                  currentBoldText = ''
-                  inBold = false
-                }
+                flushStyledText()
                 fullText += '\n'
               }
               
               lastY = currentY
               lastX = currentX + item.width
               
-              // Handle bold text grouping
-              if (isBold) {
-                if (!inBold) {
-                  inBold = true
-                  currentBoldText = text
-                } else {
-                  currentBoldText += text
-                }
-              } else {
-                // Close bold tag if we were in bold
-                if (inBold && currentBoldText) {
-                  fullText += `<b>${currentBoldText}</b>`
-                  currentBoldText = ''
-                  inBold = false
-                }
-                
-                // Add italic if needed
-                if (isItalic) {
-                  fullText += `<i>${text}</i>`
-                } else {
-                  fullText += text
-                }
+              // Check if style changed
+              const styleChanged = 
+                currentStyle.bold !== isBold || 
+                currentStyle.italic !== isItalic ||
+                (currentStyledText && Math.abs(currentStyle.fontSize - fontSize) > 2)
+              
+              if (styleChanged) {
+                flushStyledText()
               }
+              
+              // Update current style and accumulate text
+              currentStyle = { bold: isBold, italic: isItalic, fontSize }
+              currentStyledText += text
             }
             
-            // Close any remaining bold at end of page
-            if (inBold && currentBoldText) {
-              fullText += `<b>${currentBoldText}</b>`
-              currentBoldText = ''
-              inBold = false
-            }
+            // Flush remaining text at end of page
+            flushStyledText()
             
             // Add page break
             if (i < pdf.numPages) {
@@ -259,10 +253,8 @@ export default function Home() {
             }
           }
           
-          // Clean up the text - merge consecutive bold tags
+          // Clean up the text
           fullText = fullText
-            .replace(/<\/b><b>/g, '')
-            .replace(/<\/i><i>/g, '')
             .replace(/\n\n\n+/g, '\n\n')
             .trim()
           
