@@ -43,22 +43,6 @@ export default function Home() {
     }
   }, [jsonText])
 
-  const handleFormat = () => {
-    if (parsedJson !== undefined) {
-      setJsonText(JSON.stringify(parsedJson, null, 2))
-    }
-  }
-
-  const handleMinify = () => {
-    if (parsedJson !== undefined) {
-      setJsonText(JSON.stringify(parsedJson))
-    }
-  }
-
-  const handleClear = () => {
-    setJsonText("")
-  }
-
   const handleDownload = () => {
     if (parsedJson !== undefined) {
       const blob = new Blob([JSON.stringify(parsedJson, null, 2)], {
@@ -126,35 +110,6 @@ export default function Home() {
           </button>
         </div>
       </header>
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2">
-        <button
-          onClick={handleFormat}
-          disabled={parsedJson === undefined}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Format
-        </button>
-        <button
-          onClick={handleMinify}
-          disabled={parsedJson === undefined}
-          className="rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Minify
-        </button>
-        <button
-          onClick={handleClear}
-          className="rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-accent"
-        >
-          Clear
-        </button>
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Characters: {jsonText.length}</span>
-          <span className="text-border">|</span>
-          <span>Lines: {jsonText.split("\n").length}</span>
-        </div>
-      </div>
 
       {/* Main content */}
       <main className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
