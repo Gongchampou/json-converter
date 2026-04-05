@@ -5,7 +5,6 @@ import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
 import { Code, Eye, Braces, Download, Upload, FileText, Loader2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { convertPdfToJson } from "./actions/convert-pdf"
 
 const SAMPLE_JSON = `{
   "name": "JSON Editor",
@@ -115,23 +114,114 @@ export default function Home() {
         setConvertError(null)
         
         try {
-          // Convert file to base64
-          const arrayBuffer = await file.arrayBuffer()
-          const base64 = btoa(
-            new Uint8Array(arrayBuffer).reduce(
-              (data, byte) => data + String.fromCharCode(byte),
-              ''
-            )
-          )
+          // Load PDF.js from CDN
+          const PDFJS_VERSION = '3.11.174'
           
-          // Call server action to convert PDF with AI
-          const result = await convertPdfToJson(base64, file.name)
-          
-          if (result.success && result.data) {
-            setJsonText(JSON.stringify(result.data, null, 2))
-          } else {
-            setConvertError(result.error || 'Failed to convert PDF')
+          type TextItem = {
+            str: string
+            transform: number[]
+            fontName: string
+            width: number
+            height: number
           }
+          
+          type PDFJSLib = {
+            GlobalWorkerOptions: { workerSrc: string }
+            getDocument: (options: { data: ArrayBuffer }) => { 
+              promise: Promise<{
+                numPages: number
+                getPage: (num: number) => Promise<{
+                  getTextContent: () => Promise<{ 
+                    items: TextItem[]
+                    styles: Record<string, { fontFamily: string }>
+                  }>
+                }>
+              }>
+            }
+          }
+          
+          type PDFJSWindow = Window & typeof globalThis & { pdfjsLib?: PDFJSLib }
+          const win = window as PDFJSWindow
+          
+          // Load the library if not already loaded
+          if (!win.pdfjsLib) {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement('script')
+              script.src = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`
+              script.async = true
+              script.onload = () => {
+                if (win.pdfjsLib) {
+                  win.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`
+                  resolve()
+                } else {
+                  reject(new Error('PDF.js library not found'))
+                }
+              }
+              script.onerror = () => reject(new Error('Failed to load PDF.js'))
+              document.head.appendChild(script)
+            })
+          }
+          
+          const pdfjsLib = win.pdfjsLib!
+          const arrayBuffer = await file.arrayBuffer()
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+          
+          let fullText = ''
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i)
+            const textContent = await page.getTextContent()
+            
+            let lastY: number | null = null
+            
+            for (const item of textContent.items) {
+              const text = item.str
+              if (!text) continue
+              
+              // Get font size from transform matrix (item.transform[0] is scaleX)
+              const fontSize = Math.abs(item.transform[0])
+              
+              // Check font name for bold/italic hints
+              const fontName = item.fontName.toLowerCase()
+              const isBold = fontName.includes('bold') || fontName.includes('black') || fontName.includes('heavy')
+              const isItalic = fontName.includes('italic') || fontName.includes('oblique')
+              
+              // Detect line breaks based on Y position change
+              const currentY = item.transform[5]
+              if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 0.5) {
+                fullText += '\\n'
+              }
+              lastY = currentY
+              
+              // Wrap text with styling tags
+              let styledText = text
+              
+              // Apply bold if detected
+              if (isBold && fontSize > 14) {
+                styledText = `<b style="font-size:${Math.round(fontSize)}px;">${styledText}</b>`
+              } else if (isBold) {
+                styledText = `<b>${styledText}</b>`
+              } else if (fontSize > 16) {
+                // Large text gets font-size
+                styledText = `<span style="font-size:${Math.round(fontSize)}px;">${styledText}</span>`
+              }
+              
+              // Apply italic if detected
+              if (isItalic) {
+                styledText = `<i>${styledText}</i>`
+              }
+              
+              fullText += styledText
+            }
+            
+            // Add page break
+            if (i < pdf.numPages) {
+              fullText += '\\n\\n'
+            }
+          }
+          
+          const jsonData = { content: fullText.trim() }
+          setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
         } finally {
