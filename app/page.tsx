@@ -44,59 +44,67 @@ export default function Home() {
       return
     }
     
-    console.log("[v0] Selected text in preview:", selectedText)
+    // Escape the selected text to match JSON source format
+    // In JSON, newlines are stored as \n, tabs as \t, etc.
+    const escapeForJson = (text: string) => {
+      return text
+        .replace(/\\/g, '\\\\')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+    }
+    
+    const escapedText = escapeForJson(selectedText)
     
     // Try multiple matching strategies
     let start = -1
-    let matchLength = selectedText.length
+    let matchLength = 0
     
-    // Strategy 1: Direct match
+    // Strategy 1: Direct match (works for keys, numbers, etc.)
     start = jsonText.indexOf(selectedText)
-    console.log("[v0] Strategy 1 (direct):", start)
+    if (start !== -1) {
+      matchLength = selectedText.length
+    }
     
-    // Strategy 2: Try with escaped newlines (for content that might have \n in source)
+    // Strategy 2: Try with escaped characters (for content inside JSON strings)
     if (start === -1) {
-      const escapedText = selectedText.replace(/\n/g, '\\n')
       start = jsonText.indexOf(escapedText)
       if (start !== -1) {
         matchLength = escapedText.length
       }
-      console.log("[v0] Strategy 2 (escaped newlines):", start)
     }
     
-    // Strategy 3: Try wrapping in quotes (for JSON string values)
+    // Strategy 3: Try wrapping in quotes (for complete JSON string values)
     if (start === -1) {
-      const quotedText = `"${selectedText}"`
+      const quotedText = `"${escapedText}"`
       const quotedStart = jsonText.indexOf(quotedText)
       if (quotedStart !== -1) {
-        start = quotedStart
-        matchLength = quotedText.length
+        // Highlight just the value content, not the quotes
+        start = quotedStart + 1
+        matchLength = escapedText.length
       }
-      console.log("[v0] Strategy 3 (quoted):", start)
     }
     
-    // Strategy 4: Search for partial matches in JSON values
+    // Strategy 4: Search for partial matches within JSON string values
     if (start === -1) {
-      // Look for the selected text as part of a JSON string value
-      const regex = new RegExp(`"[^"]*${selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"`)
+      // Build a regex to find the escaped text within a JSON string
+      const escapedForRegex = escapedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(`"[^"]*?(${escapedForRegex})[^"]*?"`)
       const match = jsonText.match(regex)
-      if (match && match.index !== undefined) {
-        // Find where the selected text starts within the matched string
-        const matchedStr = match[0]
-        const innerStart = matchedStr.indexOf(selectedText)
-        if (innerStart !== -1) {
-          start = match.index + innerStart
-          matchLength = selectedText.length
+      if (match && match.index !== undefined && match[1]) {
+        // Find exact position of our text within the matched string
+        const fullMatch = match[0]
+        const innerIndex = fullMatch.indexOf(escapedText)
+        if (innerIndex !== -1) {
+          start = match.index + innerIndex
+          matchLength = escapedText.length
         }
       }
-      console.log("[v0] Strategy 4 (partial in value):", start)
     }
     
-    if (start !== -1) {
-      console.log("[v0] Found match at:", start, "length:", matchLength)
+    if (start !== -1 && matchLength > 0) {
       setHighlightRange({ start, end: start + matchLength })
     } else {
-      console.log("[v0] No match found")
       setHighlightRange(null)
     }
   }, [jsonText])
