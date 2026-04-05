@@ -180,6 +180,10 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
 
 export function JsonPreview({ data, error }: JsonPreviewProps) {
   const [copied, setCopied] = useState(false)
+  
+  console.log("[v0] JsonPreview received data:", data)
+  console.log("[v0] JsonPreview received error:", error)
+  console.log("[v0] data === undefined:", data === undefined)
 
   const formattedJson = useMemo(() => {
     if (data === undefined) return ""
@@ -254,7 +258,7 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
               <p className="mt-1 text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
-        ) : data === undefined ? (
+        ) : data === undefined || data === null ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
             <div className="rounded-full bg-muted p-4">
               <FileText className="size-8 text-muted-foreground" />
@@ -263,6 +267,18 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
               <p className="font-medium text-foreground">No Data to Preview</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Paste or type JSON in the editor to see it displayed here
+              </p>
+            </div>
+          </div>
+        ) : typeof data === "object" && Object.keys(data as object).length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <FileText className="size-8 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Empty Object</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The JSON contains an empty object or array
               </p>
             </div>
           </div>
