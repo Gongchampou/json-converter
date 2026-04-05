@@ -29,18 +29,13 @@ export default function Home() {
   const [jsonText, setJsonText] = useState(SAMPLE_JSON)
 
   const { parsedJson, error } = useMemo(() => {
-    console.log("[v0] jsonText value:", jsonText)
-    console.log("[v0] jsonText trimmed:", jsonText.trim())
     if (!jsonText.trim()) {
-      console.log("[v0] Empty text, returning undefined")
       return { parsedJson: undefined, error: null }
     }
     try {
       const parsed = JSON.parse(jsonText)
-      console.log("[v0] Parsed JSON successfully:", parsed)
       return { parsedJson: parsed, error: null }
     } catch (e) {
-      console.log("[v0] JSON parse error:", e)
       return {
         parsedJson: undefined,
         error: e instanceof Error ? e.message : "Invalid JSON",

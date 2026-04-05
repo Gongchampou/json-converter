@@ -84,6 +84,23 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
         // Not a valid date, render as string
       }
     }
+    // Check if it contains HTML tags - render as HTML document
+    if (value.match(/<[^>]+>/)) {
+      return (
+        <div 
+          className="prose prose-invert max-w-none text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_b]:text-foreground [&_i]:italic [&_u]:underline"
+          dangerouslySetInnerHTML={{ __html: value }}
+        />
+      )
+    }
+    // Check if it's a long text (multiline) - render as paragraph
+    if (value.includes("\n") || value.length > 100) {
+      return (
+        <p className="text-foreground leading-relaxed whitespace-pre-line">
+          {value}
+        </p>
+      )
+    }
     return <span className="text-foreground">{value}</span>
   }
 
@@ -180,10 +197,6 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
 
 export function JsonPreview({ data, error }: JsonPreviewProps) {
   const [copied, setCopied] = useState(false)
-  
-  console.log("[v0] JsonPreview received data:", data)
-  console.log("[v0] JsonPreview received error:", error)
-  console.log("[v0] data === undefined:", data === undefined)
 
   const formattedJson = useMemo(() => {
     if (data === undefined) return ""
