@@ -1,12 +1,63 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, createContext, useContext } from "react"
 import { Copy, Check, FileText } from "lucide-react"
+
+// Context to pass highlight text to nested components
+const HighlightContext = createContext<string | null>(null)
+
+// Helper function to highlight text matches
+function HighlightedText({ text }: { text: string }) {
+  const highlightText = useContext(HighlightContext)
+  
+  if (!highlightText || highlightText.length < 2) {
+    return <>{text}</>
+  }
+  
+  // Find all occurrences of the highlight text (case-insensitive)
+  const parts: { text: string; highlight: boolean }[] = []
+  let lastIndex = 0
+  const lowerText = text.toLowerCase()
+  const lowerHighlight = highlightText.toLowerCase()
+  
+  let index = lowerText.indexOf(lowerHighlight)
+  while (index !== -1) {
+    if (index > lastIndex) {
+      parts.push({ text: text.slice(lastIndex, index), highlight: false })
+    }
+    parts.push({ text: text.slice(index, index + highlightText.length), highlight: true })
+    lastIndex = index + highlightText.length
+    index = lowerText.indexOf(lowerHighlight, lastIndex)
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push({ text: text.slice(lastIndex), highlight: false })
+  }
+  
+  if (parts.length === 0) {
+    return <>{text}</>
+  }
+  
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.highlight ? (
+          <mark key={i} className="border-b-2 border-yellow-500 bg-yellow-500/20 text-inherit">
+            {part.text}
+          </mark>
+        ) : (
+          <span key={i}>{part.text}</span>
+        )
+      )}
+    </>
+  )
+}
 
 interface JsonPreviewProps {
   data: unknown
   error?: string | null
   onSelection?: (selectedText: string) => void
+  highlightText?: string | null
 }
 
 function formatKey(key: string): string {
@@ -45,30 +96,30 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
     // Convert literal \n to actual newlines for display
     const processedValue = value.replace(/\\n/g, "\n")
     
-    // Check if it's a URL
-    if (processedValue.match(/^https?:\/\//)) {
-      return (
-        <a
-          href={processedValue}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2 hover:text-primary/80"
-        >
-          {processedValue}
-        </a>
-      )
-    }
-    // Check if it's an email
-    if (processedValue.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      return (
-        <a
-          href={`mailto:${processedValue}`}
-          className="text-primary underline underline-offset-2 hover:text-primary/80"
-        >
-          {processedValue}
-        </a>
-      )
-    }
+// Check if it's a URL
+  if (processedValue.match(/^https?:\/\//)) {
+  return (
+  <a
+  href={processedValue}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-primary underline underline-offset-2 hover:text-primary/80"
+  >
+  <HighlightedText text={processedValue} />
+  </a>
+  )
+  }
+  // Check if it's an email
+  if (processedValue.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+  return (
+  <a
+  href={`mailto:${processedValue}`}
+  className="text-primary underline underline-offset-2 hover:text-primary/80"
+  >
+  <HighlightedText text={processedValue} />
+  </a>
+  )
+  }
     // Check if it looks like a date
     if (processedValue.match(/^\d{4}-\d{2}-\d{2}/) || processedValue.match(/^\d{2}\/\d{2}\/\d{4}/)) {
       try {
@@ -97,15 +148,15 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
         />
       )
     }
-    // Check if it's a long text (multiline) - render as paragraph
-    if (processedValue.includes("\n") || processedValue.length > 100) {
-      return (
-        <p className="text-foreground leading-relaxed whitespace-pre-line">
-          {processedValue}
-        </p>
-      )
-    }
-    return <span className="text-foreground">{processedValue}</span>
+// Check if it's a long text (multiline) - render as paragraph
+  if (processedValue.includes("\n") || processedValue.length > 100) {
+  return (
+  <p className="text-foreground leading-relaxed whitespace-pre-line">
+  <HighlightedText text={processedValue} />
+  </p>
+  )
+  }
+  return <span className="text-foreground"><HighlightedText text={processedValue} /></span>
   }
 
   if (Array.isArray(value)) {
@@ -124,14 +175,14 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
     if (allPrimitives) {
       return (
         <div className="flex flex-wrap gap-1.5">
-          {value.map((item, index) => (
-            <span
-              key={index}
-              className="inline-flex items-center rounded-md bg-accent px-2 py-1 text-sm"
-            >
-              {String(item)}
-            </span>
-          ))}
+{value.map((item, index) => (
+  <span
+  key={index}
+  className="inline-flex items-center rounded-md bg-accent px-2 py-1 text-sm"
+  >
+  <HighlightedText text={String(item)} />
+  </span>
+  ))}
         </div>
       )
     }
@@ -190,7 +241,7 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   return <span>{String(value)}</span>
 }
 
-export function JsonPreview({ data, error, onSelection }: JsonPreviewProps) {
+export function JsonPreview({ data, error, onSelection, highlightText }: JsonPreviewProps) {
   const [copied, setCopied] = useState(false)
 
   // Handle text selection in the preview
@@ -308,14 +359,16 @@ export function JsonPreview({ data, error, onSelection }: JsonPreviewProps) {
             </div>
           </div>
         ) : (
-          <div className="bg-card p-8">
-            {/* Document container - like a PDF page */}
-            <div className="mx-auto max-w-3xl">
-              <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
-                <RenderValue value={data} />
-              </div>
-            </div>
-          </div>
+<div className="bg-card p-8">
+  {/* Document container - like a PDF page */}
+  <div className="mx-auto max-w-3xl">
+  <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
+  <HighlightContext.Provider value={highlightText || null}>
+    <RenderValue value={data} />
+  </HighlightContext.Provider>
+  </div>
+  </div>
+  </div>
         )}
       </div>
     </div>

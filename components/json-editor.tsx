@@ -9,9 +9,10 @@ interface JsonEditorProps {
   onChange: (value: string) => void
   error?: string | null
   highlightRange?: HighlightRange | null
+  onSelection?: (selectedText: string) => void
 }
 
-export function JsonEditor({ value, onChange, error, highlightRange }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, highlightRange, onSelection }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
@@ -83,6 +84,26 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
       return () => textarea.removeEventListener("scroll", handleScroll)
     }
   }, [handleScroll])
+
+  // Handle text selection in the editor
+  const handleMouseUp = useCallback(() => {
+    const selection = window.getSelection()
+    const selectedText = selection?.toString().trim() || ""
+    onSelection?.(selectedText)
+  }, [onSelection])
+
+  // Clear selection when clicking outside or pressing escape
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) {
+        onSelection?.("")
+      }
+    }
+
+    document.addEventListener("selectionchange", handleSelectionChange)
+    return () => document.removeEventListener("selectionchange", handleSelectionChange)
+  }, [onSelection])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab") {
@@ -239,8 +260,10 @@ export function JsonEditor({ value, onChange, error, highlightRange }: JsonEdito
             ref={textareaRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            spellCheck={false}
+onKeyDown={handleKeyDown}
+  onMouseUp={handleMouseUp}
+  onSelect={handleMouseUp}
+  spellCheck={false}
             className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
               !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}

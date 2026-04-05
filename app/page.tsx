@@ -36,9 +36,23 @@ export default function Home() {
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState<string | null>(null)
   const [highlightRange, setHighlightRange] = useState<HighlightRange | null>(null)
+  const [editorSelectedText, setEditorSelectedText] = useState<string | null>(null)
+
+  // Callback when text is selected in the editor
+  const handleEditorSelection = useCallback((selectedText: string) => {
+    setEditorSelectedText(selectedText || null)
+    // Clear the preview-to-editor highlight when selecting in editor
+    if (selectedText) {
+      setHighlightRange(null)
+    }
+  }, [])
 
   // Callback when text is selected in the preview
   const handlePreviewSelection = useCallback((selectedText: string) => {
+    // Clear the editor-to-preview highlight when selecting in preview
+    if (selectedText) {
+      setEditorSelectedText(null)
+    }
     if (!selectedText) {
       setHighlightRange(null)
       return
@@ -724,14 +738,14 @@ export default function Home() {
         {/* Editor Panel */}
         <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
           <div className="min-h-0 flex-1">
-            <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
+            <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} onSelection={handleEditorSelection} />
           </div>
         </div>
 
         {/* Preview Panel */}
         <div className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1">
-            <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
+            <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} highlightText={editorSelectedText} />
           </div>
         </div>
       </main>
