@@ -41,34 +41,37 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   }
 
   if (typeof value === "string") {
+    // Convert literal \n to actual newlines for display
+    const processedValue = value.replace(/\\n/g, "\n")
+    
     // Check if it's a URL
-    if (value.match(/^https?:\/\//)) {
+    if (processedValue.match(/^https?:\/\//)) {
       return (
         <a
-          href={value}
+          href={processedValue}
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary underline underline-offset-2 hover:text-primary/80"
         >
-          {value}
+          {processedValue}
         </a>
       )
     }
     // Check if it's an email
-    if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+    if (processedValue.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       return (
         <a
-          href={`mailto:${value}`}
+          href={`mailto:${processedValue}`}
           className="text-primary underline underline-offset-2 hover:text-primary/80"
         >
-          {value}
+          {processedValue}
         </a>
       )
     }
     // Check if it looks like a date
-    if (value.match(/^\d{4}-\d{2}-\d{2}/) || value.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+    if (processedValue.match(/^\d{4}-\d{2}-\d{2}/) || processedValue.match(/^\d{2}\/\d{2}\/\d{4}/)) {
       try {
-        const date = new Date(value)
+        const date = new Date(processedValue)
         if (!isNaN(date.getTime())) {
           return (
             <span className="text-foreground">
@@ -85,23 +88,23 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
       }
     }
     // Check if it contains HTML tags - render as HTML document
-    if (value.match(/<[^>]+>/)) {
+    if (processedValue.match(/<[^>]+>/)) {
       return (
         <div 
           className="prose dark:prose-invert max-w-none text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_b]:text-foreground [&_i]:italic [&_u]:underline"
-          dangerouslySetInnerHTML={{ __html: value }}
+          dangerouslySetInnerHTML={{ __html: processedValue }}
         />
       )
     }
     // Check if it's a long text (multiline) - render as paragraph
-    if (value.includes("\n") || value.length > 100) {
+    if (processedValue.includes("\n") || processedValue.length > 100) {
       return (
         <p className="text-foreground leading-relaxed whitespace-pre-line">
-          {value}
+          {processedValue}
         </p>
       )
     }
-    return <span className="text-foreground">{value}</span>
+    return <span className="text-foreground">{processedValue}</span>
   }
 
   if (Array.isArray(value)) {
