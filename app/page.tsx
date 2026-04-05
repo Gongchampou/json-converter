@@ -157,27 +157,27 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <main className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+      <main className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
         {/* Editor Panel */}
-        <div className="flex flex-col border-b border-border md:border-b-0 md:border-r">
-          <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+        <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
             <Code className="size-4 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Editor</span>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1">
             <JsonEditor value={jsonText} onChange={setJsonText} error={error} />
           </div>
         </div>
 
         {/* Preview Panel */}
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+        <div className="flex min-h-0 flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
             <Eye className="size-4 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">
               Preview
             </span>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1">
             <JsonPreview data={parsedJson} error={error} />
           </div>
         </div>

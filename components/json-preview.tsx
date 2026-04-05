@@ -296,9 +296,9 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
             </div>
           </div>
         ) : (
-          <div className="min-h-0 bg-card">
+          <div className="bg-card p-8">
             {/* Document container - like a PDF page */}
-            <div className="mx-auto max-w-3xl p-8">
+            <div className="mx-auto max-w-3xl">
               <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
                 <RenderValue value={data} />
               </div>
