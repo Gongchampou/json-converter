@@ -321,6 +321,38 @@ export default function Home() {
           const parser = new DOMParser()
           const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
           
+          // First pass: count colors to find the most common one (default color)
+          const colorCounts: Record<string, number> = { '': 0 }
+          const allRuns = xmlDoc.getElementsByTagName('w:r')
+          
+          for (let r = 0; r < allRuns.length; r++) {
+            const run = allRuns[r]
+            const rPr = run.getElementsByTagName('w:rPr')[0]
+            let color = ''
+            
+            if (rPr) {
+              const colorEl = rPr.getElementsByTagName('w:color')[0]
+              if (colorEl) {
+                const colorVal = colorEl.getAttribute('w:val')
+                if (colorVal && colorVal !== 'auto' && colorVal !== '000000') {
+                  color = '#' + colorVal
+                }
+              }
+            }
+            
+            colorCounts[color] = (colorCounts[color] || 0) + 1
+          }
+          
+          // Find the most common color - this becomes the default (no tag needed)
+          let defaultColor = ''
+          let maxCount = 0
+          for (const [color, count] of Object.entries(colorCounts)) {
+            if (count > maxCount) {
+              maxCount = count
+              defaultColor = color
+            }
+          }
+          
           let fullText = ''
           
           // Track current formatting state for grouping
@@ -333,8 +365,8 @@ export default function Home() {
             
             let formatted = currentText
             
-            // Apply formatting only if different from default (no formatting)
-            if (currentStyle.color) {
+            // Only add font tag if color is DIFFERENT from the most common color
+            if (currentStyle.color && currentStyle.color !== defaultColor) {
               formatted = `<font color="${currentStyle.color}">${formatted}</font>`
             }
             if (currentStyle.underline) {
