@@ -167,8 +167,8 @@ export default function Home() {
           const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
           
           let fullText = ''
-          let currentStyledText = ''
-          let currentStyle = { bold: false, italic: false, fontSize: 0 }
+          let currentBoldText = ''
+          let inBold = false
           
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i)
@@ -177,22 +177,13 @@ export default function Home() {
             let lastY: number | null = null
             let lastX: number | null = null
             
-            // Helper to flush current styled text
-            const flushStyledText = () => {
-              if (!currentStyledText) return
-              
-              const styles: string[] = []
-              if (currentStyle.bold) styles.push('font-weight:bold')
-              if (currentStyle.italic) styles.push('font-style:italic')
-              if (currentStyle.fontSize > 14) styles.push(`font-size:${Math.round(currentStyle.fontSize)}px`)
-              
-              if (styles.length > 0) {
-                const tag = currentStyle.bold ? 'b' : 'span'
-                fullText += `<${tag} style="${styles.join(';')};">${currentStyledText}</${tag}>`
-              } else {
-                fullText += currentStyledText
+            // Helper to flush bold text
+            const flushBold = () => {
+              if (inBold && currentBoldText) {
+                fullText += `<b>${currentBoldText}</b>`
+                currentBoldText = ''
+                inBold = false
               }
-              currentStyledText = ''
             }
             
             for (const item of textContent.items) {
@@ -213,7 +204,7 @@ export default function Home() {
               
               // Check for line break
               if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 0.8) {
-                flushStyledText()
+                flushBold()
                 
                 // Double line break for larger gaps (paragraph)
                 if (Math.abs(currentY - lastY) > fontSize * 2) {
@@ -222,30 +213,33 @@ export default function Home() {
                   fullText += '\n'
                 }
               } else if (lastX !== null && currentX < lastX - 50) {
-                flushStyledText()
+                flushBold()
                 fullText += '\n'
               }
               
               lastY = currentY
               lastX = currentX + item.width
               
-              // Check if style changed
-              const styleChanged = 
-                currentStyle.bold !== isBold || 
-                currentStyle.italic !== isItalic ||
-                (currentStyledText && Math.abs(currentStyle.fontSize - fontSize) > 2)
-              
-              if (styleChanged) {
-                flushStyledText()
+              // Handle text with simple tags
+              if (isBold) {
+                if (!inBold) {
+                  inBold = true
+                  currentBoldText = text
+                } else {
+                  currentBoldText += text
+                }
+              } else {
+                flushBold()
+                if (isItalic) {
+                  fullText += `<i>${text}</i>`
+                } else {
+                  fullText += text
+                }
               }
-              
-              // Update current style and accumulate text
-              currentStyle = { bold: isBold, italic: isItalic, fontSize }
-              currentStyledText += text
             }
             
-            // Flush remaining text at end of page
-            flushStyledText()
+            // Flush remaining bold at end of page
+            flushBold()
             
             // Add page break
             if (i < pdf.numPages) {
@@ -253,8 +247,10 @@ export default function Home() {
             }
           }
           
-          // Clean up the text
+          // Clean up the text - merge consecutive tags
           fullText = fullText
+            .replace(/<\/b><b>/g, '')
+            .replace(/<\/i><i>/g, '')
             .replace(/\n\n\n+/g, '\n\n')
             .trim()
           
