@@ -86,23 +86,42 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
   }, [handleScroll])
 
   // Handle text selection in the editor
-  const handleMouseUp = useCallback(() => {
-    const selection = window.getSelection()
-    const selectedText = selection?.toString().trim() || ""
-    onSelection?.(selectedText)
-  }, [onSelection])
+  const handleTextSelect = useCallback(() => {
+    console.log("[v0] handleTextSelect called, onSelection exists:", !!onSelection)
+    // Use setTimeout to ensure the selection is complete
+    setTimeout(() => {
+      const textarea = textareaRef.current
+      if (!textarea) {
+        console.log("[v0] textarea ref is null")
+        return
+      }
+      
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      console.log("[v0] Selection range:", start, end)
+      
+      if (start !== end) {
+        const selectedText = value.substring(start, end).trim()
+        console.log("[v0] Editor selection from textarea:", selectedText)
+        if (onSelection) {
+          onSelection(selectedText)
+        } else {
+          console.log("[v0] WARNING: onSelection is undefined!")
+        }
+      }
+    }, 10) // Increased timeout for reliability
+  }, [onSelection, value])
 
-  // Clear selection when clicking outside or pressing escape
+  // Clear selection when clicking outside the textarea
   useEffect(() => {
-    const handleSelectionChange = () => {
-      const selection = window.getSelection()
-      if (!selection || selection.isCollapsed) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (textareaRef.current && !textareaRef.current.contains(e.target as Node)) {
         onSelection?.("")
       }
     }
 
-    document.addEventListener("selectionchange", handleSelectionChange)
-    return () => document.removeEventListener("selectionchange", handleSelectionChange)
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [onSelection])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -261,8 +280,8 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
             value={value}
             onChange={(e) => onChange(e.target.value)}
 onKeyDown={handleKeyDown}
-  onMouseUp={handleMouseUp}
-  onSelect={handleMouseUp}
+  onMouseUp={handleTextSelect}
+  onSelect={handleTextSelect}
   spellCheck={false}
             className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
               !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
