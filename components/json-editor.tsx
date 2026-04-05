@@ -167,32 +167,18 @@ return highlightMap
       
       if (start !== end) {
         // Store the exact selection range for underlining
-        console.log("[v0] Setting selectionRange:", { start, end })
         setSelectionRange({ start, end })
         const selectedText = value.substring(start, end).trim()
         onSelection?.(selectedText)
-      }
-      // Don't clear selection on single click - only clear when clicking outside
-    }, 50) // Increased timeout
-  }, [onSelection, value])
-
-  // Clear selection only when clicking outside the editor container - use a ref to track
-  const editorContainerRef = useRef<HTMLDivElement>(null)
-  
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      // Check if click is outside the entire editor area
-      if (editorContainerRef.current && !editorContainerRef.current.contains(e.target as Node)) {
-        console.log("[v0] Click outside editor, clearing selection")
+      } else {
+        // Clear selection if it's just a cursor click
         setSelectionRange(null)
         onSelection?.("")
       }
-    }
+    }, 50)
+  }, [onSelection, value])
 
-    // Use click instead of mouseup to avoid interference with selection
-    document.addEventListener("click", handleClickOutside)
-    return () => document.removeEventListener("click", handleClickOutside)
-  }, [onSelection])
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab") {
@@ -253,7 +239,7 @@ return highlightMap
   })()
 
   return (
-    <div ref={editorContainerRef} className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
           <div className="flex size-3 items-center justify-center rounded-full bg-[#ff5f56]" />
@@ -340,7 +326,7 @@ return highlightMap
           {/* Hidden measurement div - measures actual line heights including wrapping */}
           <div
             ref={measureRef}
-            className="pointer-events-none invisible absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
+            className="pointer-events-none invisible absolute inset-0 overflow-y-auto p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
             aria-hidden="true"
           >
             {lines.map((line, i) => (
@@ -352,7 +338,7 @@ return highlightMap
           {/* Highlight overlay - shows underlines for selected text */}
           <div
             ref={highlightRef}
-            className="pointer-events-none absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
+            className="pointer-events-none absolute inset-0 overflow-y-auto p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
             aria-hidden="true"
           >
             {lines.map((line, i) => (

@@ -37,13 +37,17 @@ export default function Home() {
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState<string | null>(null)
   const [highlightRange, setHighlightRange] = useState<HighlightRange | null>(null)
+  const [editorSelectedText, setEditorSelectedText] = useState<string | null>(null)
 
   // Callback when text is selected in the preview
-  const handlePreviewSelection = useCallback((selectedText: string) => {
-    if (!selectedText) {
+  const handlePreviewSelection = useCallback((rawSelectedText: string) => {
+    if (!rawSelectedText) {
       setHighlightRange(null)
       return
     }
+    
+    // Normalize newlines from Windows/browsers
+    const selectedText = rawSelectedText.replace(/\r\n/g, '\n')
     
     // Escape the selected text to match JSON source format
     // In JSON, newlines are stored as \n (literal backslash + n), tabs as \t, etc.
@@ -117,6 +121,7 @@ export default function Home() {
           .replace(/\\r/g, '\r')
           .replace(/\\t/g, '\t')
           .replace(/<[^>]*>/g, '') // Remove HTML tags (handles escaped quotes inside)
+          .replace(/\\"/g, '"') // Correctly replace escaped quotes inside the JSON string
         
         const indexInStripped = strippedContent.indexOf(selectedText)
         if (indexInStripped !== -1) {
@@ -725,12 +730,12 @@ export default function Home() {
   <ResizablePanels
     leftPanel={
       <div className="min-h-0 flex-1">
-        <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
+        <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} onSelection={setEditorSelectedText} />
       </div>
     }
     rightPanel={
       <div className="min-h-0 flex-1">
-        <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
+        <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} highlightText={editorSelectedText} />
       </div>
     }
     defaultLeftWidth={50}

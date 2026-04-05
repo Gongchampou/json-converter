@@ -15,8 +15,11 @@ function HighlightedHtml({ html }: { html: string }) {
       return html
     }
     
+    // Normalize escaped JSON newlines to actual newlines for matching
+    const normalizedHighlightText = highlightText.replace(/\\n/g, "\n")
+    
     // Escape special regex characters in the search text
-    const escapedSearch = highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedSearch = normalizedHighlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     
     // Create a regex that matches the text but not inside HTML tags
     const regex = new RegExp(`(${escapedSearch})(?![^<]*>)`, 'gi')
@@ -41,19 +44,22 @@ function HighlightedText({ text }: { text: string }) {
     return <>{text}</>
   }
   
+  // Normalize escaped JSON newlines to actual newlines for matching
+  const normalizedHighlightText = highlightText.replace(/\\n/g, "\n")
+  
   // Find all occurrences of the highlight text (case-insensitive)
   const parts: { text: string; highlight: boolean }[] = []
   let lastIndex = 0
   const lowerText = text.toLowerCase()
-  const lowerHighlight = highlightText.toLowerCase()
+  const lowerHighlight = normalizedHighlightText.toLowerCase()
   
   let index = lowerText.indexOf(lowerHighlight)
   while (index !== -1) {
     if (index > lastIndex) {
       parts.push({ text: text.slice(lastIndex, index), highlight: false })
     }
-    parts.push({ text: text.slice(index, index + highlightText.length), highlight: true })
-    lastIndex = index + highlightText.length
+    parts.push({ text: text.slice(index, index + normalizedHighlightText.length), highlight: true })
+    lastIndex = index + normalizedHighlightText.length
     index = lowerText.indexOf(lowerHighlight, lastIndex)
   }
   
