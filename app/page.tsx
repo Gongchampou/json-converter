@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
 import { Code, Eye, Braces, Download, Upload, FileText, Loader2, FileType } from "lucide-react"
@@ -26,10 +26,39 @@ const SAMPLE_JSON = `{
   "downloads": 12500
 }`
 
+export interface HighlightRange {
+  start: number
+  end: number
+}
+
 export default function Home() {
   const [jsonText, setJsonText] = useState(SAMPLE_JSON)
   const [isConverting, setIsConverting] = useState(false)
   const [convertError, setConvertError] = useState<string | null>(null)
+  const [highlightRange, setHighlightRange] = useState<HighlightRange | null>(null)
+
+  // Callback when text is selected in the preview
+  const handlePreviewSelection = useCallback((selectedText: string) => {
+    if (!selectedText) {
+      setHighlightRange(null)
+      return
+    }
+    
+    // Find the selected text in the JSON source
+    const start = jsonText.indexOf(selectedText)
+    if (start !== -1) {
+      setHighlightRange({ start, end: start + selectedText.length })
+    } else {
+      // Try to find escaped version (for content that might have \n in source)
+      const escapedText = selectedText.replace(/\n/g, '\\n')
+      const escapedStart = jsonText.indexOf(escapedText)
+      if (escapedStart !== -1) {
+        setHighlightRange({ start: escapedStart, end: escapedStart + escapedText.length })
+      } else {
+        setHighlightRange(null)
+      }
+    }
+  }, [jsonText])
 
   const { parsedJson, error } = useMemo(() => {
     if (!jsonText.trim()) {
@@ -549,14 +578,14 @@ export default function Home() {
         {/* Editor Panel */}
         <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
           <div className="min-h-0 flex-1">
-            <JsonEditor value={jsonText} onChange={setJsonText} error={error} />
+            <JsonEditor value={jsonText} onChange={setJsonText} error={error} highlightRange={highlightRange} />
           </div>
         </div>
 
         {/* Preview Panel */}
         <div className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1">
-            <JsonPreview data={parsedJson} error={error} />
+            <JsonPreview data={parsedJson} error={error} onSelection={handlePreviewSelection} />
           </div>
         </div>
       </main>

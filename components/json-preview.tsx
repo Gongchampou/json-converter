@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Copy, Check, FileText } from "lucide-react"
 
 interface JsonPreviewProps {
   data: unknown
   error?: string | null
+  onSelection?: (selectedText: string) => void
 }
 
 function formatKey(key: string): string {
@@ -189,8 +190,28 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   return <span>{String(value)}</span>
 }
 
-export function JsonPreview({ data, error }: JsonPreviewProps) {
+export function JsonPreview({ data, error, onSelection }: JsonPreviewProps) {
   const [copied, setCopied] = useState(false)
+
+  // Handle text selection in the preview
+  const handleMouseUp = useCallback(() => {
+    const selection = window.getSelection()
+    const selectedText = selection?.toString().trim() || ""
+    onSelection?.(selectedText)
+  }, [onSelection])
+
+  // Clear selection when clicking outside or pressing escape
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) {
+        onSelection?.("")
+      }
+    }
+
+    document.addEventListener("selectionchange", handleSelectionChange)
+    return () => document.removeEventListener("selectionchange", handleSelectionChange)
+  }, [onSelection])
 
   const formattedJson = useMemo(() => {
     if (data === undefined) return ""
@@ -212,7 +233,7 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" onMouseUp={handleMouseUp}>
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
           <FileText className="size-4 text-muted-foreground" />
