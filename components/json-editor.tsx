@@ -163,28 +163,35 @@ return highlightMap
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
       
+      console.log("[v0] handleTextSelect - start:", start, "end:", end, "diff:", end - start)
+      
       if (start !== end) {
         // Store the exact selection range for underlining
+        console.log("[v0] Setting selectionRange:", { start, end })
         setSelectionRange({ start, end })
         const selectedText = value.substring(start, end).trim()
         onSelection?.(selectedText)
-      } else {
-        setSelectionRange(null)
       }
-    }, 10)
+      // Don't clear selection on single click - only clear when clicking outside
+    }, 50) // Increased timeout
   }, [onSelection, value])
 
-  // Clear selection when clicking outside the textarea
+  // Clear selection only when clicking outside the editor container - use a ref to track
+  const editorContainerRef = useRef<HTMLDivElement>(null)
+  
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (textareaRef.current && !textareaRef.current.contains(e.target as Node)) {
+      // Check if click is outside the entire editor area
+      if (editorContainerRef.current && !editorContainerRef.current.contains(e.target as Node)) {
+        console.log("[v0] Click outside editor, clearing selection")
         setSelectionRange(null)
         onSelection?.("")
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    // Use click instead of mouseup to avoid interference with selection
+    document.addEventListener("click", handleClickOutside)
+    return () => document.removeEventListener("click", handleClickOutside)
   }, [onSelection])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -246,7 +253,7 @@ return highlightMap
   })()
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div ref={editorContainerRef} className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
           <div className="flex size-3 items-center justify-center rounded-full bg-[#ff5f56]" />
@@ -359,9 +366,9 @@ return highlightMap
             value={value}
             onChange={(e) => onChange(e.target.value)}
 onKeyDown={handleKeyDown}
-  onMouseUp={handleTextSelect}
-  onSelect={handleTextSelect}
-  spellCheck={false}
+              onMouseUp={handleTextSelect}
+              onSelect={handleTextSelect}
+              spellCheck={false}
             className={`absolute inset-0 min-h-0 w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground break-words whitespace-pre-wrap word-wrap ${
               !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
