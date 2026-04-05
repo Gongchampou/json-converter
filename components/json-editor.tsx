@@ -19,6 +19,7 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
   const measureRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [lineHeights, setLineHeights] = useState<number[]>([])
+  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null)
 
   const lines = value.split("\n")
   const lineCount = lines.length
@@ -78,19 +79,48 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
       charIndex = lineEnd + 1 // +1 for the newline character
     }
     
-    return highlightMap
+return highlightMap
   }, [highlightRange, lines])
 
+  // Calculate selection highlights from editor's own selection (selectionRange)
+  const selectionHighlights = useMemo(() => {
+    const highlightMap = new Map<number, { start: number; end: number }>()
+    if (!selectionRange) return highlightMap
+    
+    const { start, end } = selectionRange
+    let charIndex = 0
+    for (let i = 0; i < lines.length; i++) {
+      const lineStart = charIndex
+      const lineEnd = charIndex + lines[i].length
+      
+      if (lineEnd >= start && lineStart < end) {
+        const highlightStartInLine = Math.max(0, start - lineStart)
+        const highlightEndInLine = Math.min(lines[i].length, end - lineStart)
+        highlightMap.set(i, { start: highlightStartInLine, end: highlightEndInLine })
+      }
+      
+      charIndex = lineEnd + 1
+    }
+    
+    return highlightMap
+  }, [selectionRange, lines])
+  
   // Helper to render a line with inline underline for the highlighted portion
   const renderHighlightedLine = useCallback((line: string, lineIndex: number) => {
+    // Check for preview-to-editor highlight first
     const highlight = lineHighlights.get(lineIndex)
-    if (!highlight) {
+    // Then check for editor's own selection highlight
+    const selection = selectionHighlights.get(lineIndex)
+    
+    const activeHighlight = highlight || selection
+    
+    if (!activeHighlight) {
       return <span className="invisible">{line || "\u00A0"}</span>
     }
     
-    const before = line.slice(0, highlight.start)
-    const highlighted = line.slice(highlight.start, highlight.end)
-    const after = line.slice(highlight.end)
+    const before = line.slice(0, activeHighlight.start)
+    const highlighted = line.slice(activeHighlight.start, activeHighlight.end)
+    const after = line.slice(activeHighlight.end)
     
     return (
       <>
@@ -99,7 +129,7 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
         <span className="invisible">{after}</span>
       </>
     )
-  }, [lineHighlights])
+  }, [lineHighlights, selectionHighlights])
 
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
@@ -134,8 +164,12 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
       const end = textarea.selectionEnd
       
       if (start !== end) {
+        // Store the exact selection range for underlining
+        setSelectionRange({ start, end })
         const selectedText = value.substring(start, end).trim()
         onSelection?.(selectedText)
+      } else {
+        setSelectionRange(null)
       }
     }, 10)
   }, [onSelection, value])
@@ -144,6 +178,7 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (textareaRef.current && !textareaRef.current.contains(e.target as Node)) {
+        setSelectionRange(null)
         onSelection?.("")
       }
     }
