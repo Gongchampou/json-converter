@@ -278,8 +278,16 @@ export default function Home() {
         
         try {
           // Load mammoth.js dynamically from CDN
+          type MammothOptions = {
+            arrayBuffer: ArrayBuffer
+            styleMap?: string[]
+            includeDefaultStyleMap?: boolean
+            transformDocument?: (document: unknown) => unknown
+          }
+          
           type MammothLib = {
-            convertToHtml: (options: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
+            convertToHtml: (options: MammothOptions) => Promise<{ value: string }>
+            extractRawText: (options: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
           }
           
           type MammothWindow = Window & typeof globalThis & { mammoth?: MammothLib }
@@ -305,27 +313,40 @@ export default function Home() {
           const mammoth = win.mammoth!
           const arrayBuffer = await file.arrayBuffer()
           
-          // Convert Word to HTML - mammoth preserves bold, italic, colors, etc.
-          const result = await mammoth.convertToHtml({ arrayBuffer })
+          // Convert Word to HTML with style mappings
+          const result = await mammoth.convertToHtml({ 
+            arrayBuffer,
+            styleMap: [
+              "b => b",
+              "i => i",
+              "u => u",
+              "strike => s",
+              "highlight => mark"
+            ]
+          })
           let html = result.value
           
           // Convert HTML to simple format with \n for line breaks
-          // Replace paragraph and break tags with newlines
           html = html
-            .replace(/<\/p><p>/g, '\n\n')
+            // Handle paragraphs
+            .replace(/<\/p>\s*<p>/g, '\n\n')
             .replace(/<p>/g, '')
             .replace(/<\/p>/g, '\n')
             .replace(/<br\s*\/?>/g, '\n')
-            // Keep bold, italic, underline tags
+            // Convert strong/em to b/i
             .replace(/<strong>/g, '<b>')
             .replace(/<\/strong>/g, '</b>')
             .replace(/<em>/g, '<i>')
             .replace(/<\/em>/g, '</i>')
-            // Remove other HTML tags but keep content
-            .replace(/<(?!\/?(b|i|u|font|span)[>\s])[^>]+>/g, '')
-            // Clean up extra newlines
+            // Handle lists
+            .replace(/<li>/g, '• ')
+            .replace(/<\/li>/g, '\n')
+            .replace(/<\/?[ou]l>/g, '')
+            // Remove remaining HTML tags but keep b, i, u, font, span
+            .replace(/<(?!\/?(b|i|u|s|font|span|mark)[>\s])[^>]+>/g, '')
+            // Clean up whitespace
             .replace(/\n\n\n+/g, '\n\n')
-            .trim()
+            .replace(/^\s+|\s+$/g, '')
           
           const jsonData = { content: '\n' + html }
           setJsonText(JSON.stringify(jsonData, null, 2))
