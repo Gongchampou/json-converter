@@ -114,31 +114,60 @@ export default function Home() {
         setConvertError(null)
         
         try {
-          // Convert file to base64
-          const arrayBuffer = await file.arrayBuffer()
-          const base64 = btoa(
-            new Uint8Array(arrayBuffer).reduce(
-              (data, byte) => data + String.fromCharCode(byte),
-              ''
-            )
-          )
-          
-          const response = await fetch('/api/pdf-to-json', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              file: base64,
-              filename: file.name,
-            }),
+          // Load PDF.js from CDN dynamically
+          const PDFJS_VERSION = '4.0.379'
+          const pdfjsLib = (window as unknown as { pdfjsLib?: unknown }).pdfjsLib || await new Promise((resolve, reject) => {
+            // Check if already loaded
+            if ((window as unknown as { pdfjsLib?: unknown }).pdfjsLib) {
+              resolve((window as unknown as { pdfjsLib: unknown }).pdfjsLib)
+              return
+            }
+            
+            // Load the script
+            const script = document.createElement('script')
+            script.src = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
+            script.onload = () => {
+              const lib = (window as unknown as { pdfjsLib: { GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib
+              lib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`
+              resolve(lib)
+            }
+            script.onerror = () => reject(new Error('Failed to load PDF.js'))
+            document.head.appendChild(script)
           })
           
-          const result = await response.json()
+          // Read file as ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer()
           
-          if (result.success) {
-            setJsonText(JSON.stringify(result.data, null, 2))
-          } else {
-            setConvertError(result.error || 'Failed to convert PDF')
+          // Load the PDF document
+          const pdfLib = pdfjsLib as { getDocument: (options: { data: ArrayBuffer }) => { promise: Promise<{ numPages: number; getPage: (num: number) => Promise<{ getTextContent: () => Promise<{ items: Array<{ str?: string }> }> }> }> } }
+          const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise
+          
+          // Extract text from all pages
+          let fullText = ''
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i)
+            const textContent = await page.getTextContent()
+            
+            // Extract text items and join them
+            const pageText = textContent.items
+              .map((item) => item.str || '')
+              .join(' ')
+            
+            fullText += pageText
+            
+            // Add newline between pages
+            if (i < pdf.numPages) {
+              fullText += '\\n\\n'
+            }
           }
+          
+          // Create simple JSON with just content field
+          const jsonData = {
+            content: fullText.trim()
+          }
+          
+          setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
         } finally {
