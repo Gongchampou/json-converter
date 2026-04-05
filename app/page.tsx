@@ -204,9 +204,9 @@ export default function Home() {
                 
                 // Double line break for larger gaps (paragraph)
                 if (Math.abs(currentY - lastY) > fontSize * 2) {
-                  fullText += '\\n\\n'
+                  fullText += '\n\n'
                 } else {
-                  fullText += '\\n'
+                  fullText += '\n'
                 }
               } else if (lastX !== null && currentX < lastX - 50) {
                 // New line detected by X position reset
@@ -215,7 +215,7 @@ export default function Home() {
                   currentBoldText = ''
                   inBold = false
                 }
-                fullText += '\\n'
+                fullText += '\n'
               }
               
               lastY = currentY
@@ -255,7 +255,7 @@ export default function Home() {
             
             // Add page break
             if (i < pdf.numPages) {
-              fullText += '\\n\\n'
+              fullText += '\n\n'
             }
           }
           
@@ -263,10 +263,10 @@ export default function Home() {
           fullText = fullText
             .replace(/<\/b><b>/g, '')
             .replace(/<\/i><i>/g, '')
-            .replace(/\\n\\n\\n+/g, '\\n\\n')
+            .replace(/\n\n\n+/g, '\n\n')
             .trim()
           
-          const jsonData = { content: '\\n' + fullText }
+          const jsonData = { content: '\n' + fullText }
           setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
