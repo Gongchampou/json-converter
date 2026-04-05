@@ -98,6 +98,15 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           <div className="flex size-3 items-center justify-center rounded-full bg-[#27c93f]" />
         </div>
         <span className="ml-4 text-sm text-muted-foreground">editor.json</span>
+        {value && (
+          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+            isValidJson 
+              ? "bg-emerald-500/20 text-emerald-400" 
+              : "bg-red-500/20 text-red-400"
+          }`}>
+            {isValidJson ? "Valid" : "Invalid"}
+          </span>
+        )}
         
         {/* Editor action buttons */}
         <div className="ml-auto flex items-center gap-1.5">
@@ -166,7 +175,9 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           spellCheck={false}
-          className="min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+          className={`min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
+            !value ? "text-foreground" : isValidJson ? "text-emerald-400" : "text-red-400"
+          }`}
           placeholder="Enter your JSON here..."
         />
       </div>
