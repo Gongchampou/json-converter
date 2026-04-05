@@ -157,31 +157,22 @@ function RenderValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
     }
 
     return (
-      <div className={`space-y-3 ${depth > 0 ? "" : ""}`}>
+      <div className={`space-y-4 ${depth > 0 ? "" : ""}`}>
         {entries.map(([key, val]) => {
           const isComplexValue =
             typeof val === "object" && val !== null && Object.keys(val).length > 0
 
           return (
-            <div key={key} className={isComplexValue ? "space-y-2" : ""}>
-              <div
-                className={`${
-                  isComplexValue
-                    ? "flex flex-col gap-1"
-                    : "flex items-start justify-between gap-4"
-                }`}
-              >
-                <span className="shrink-0 text-sm font-medium text-muted-foreground">
-                  {formatKey(key)}
-                </span>
-                {!isComplexValue && (
-                  <div className="text-right">
-                    <RenderValue value={val} depth={depth + 1} />
-                  </div>
-                )}
-              </div>
-              {isComplexValue && (
+            <div key={key} className="space-y-1">
+              <span className="block text-sm font-medium text-muted-foreground">
+                {formatKey(key)}
+              </span>
+              {isComplexValue ? (
                 <div className="rounded-lg border border-border bg-card/50 p-4">
+                  <RenderValue value={val} depth={depth + 1} />
+                </div>
+              ) : (
+                <div className="text-left">
                   <RenderValue value={val} depth={depth + 1} />
                 </div>
               )}
