@@ -167,51 +167,90 @@ export default function Home() {
           const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
           
           let fullText = ''
+          let currentBoldText = ''
+          let inBold = false
           
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i)
             const textContent = await page.getTextContent()
             
             let lastY: number | null = null
+            let lastX: number | null = null
             
             for (const item of textContent.items) {
               const text = item.str
               if (!text) continue
               
-              // Get font size from transform matrix (item.transform[0] is scaleX)
+              // Get font size from transform matrix
               const fontSize = Math.abs(item.transform[0])
               
-              // Check font name for bold/italic hints
+              // Check font name for bold/italic
               const fontName = item.fontName.toLowerCase()
               const isBold = fontName.includes('bold') || fontName.includes('black') || fontName.includes('heavy')
               const isItalic = fontName.includes('italic') || fontName.includes('oblique')
               
               // Detect line breaks based on Y position change
               const currentY = item.transform[5]
-              if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 0.5) {
+              const currentX = item.transform[4]
+              
+              // Check for line break
+              if (lastY !== null && Math.abs(currentY - lastY) > fontSize * 0.8) {
+                // Close any open bold tag before line break
+                if (inBold && currentBoldText) {
+                  fullText += `<b>${currentBoldText}</b>`
+                  currentBoldText = ''
+                  inBold = false
+                }
+                
+                // Double line break for larger gaps (paragraph)
+                if (Math.abs(currentY - lastY) > fontSize * 2) {
+                  fullText += '\\n\\n'
+                } else {
+                  fullText += '\\n'
+                }
+              } else if (lastX !== null && currentX < lastX - 50) {
+                // New line detected by X position reset
+                if (inBold && currentBoldText) {
+                  fullText += `<b>${currentBoldText}</b>`
+                  currentBoldText = ''
+                  inBold = false
+                }
                 fullText += '\\n'
               }
+              
               lastY = currentY
+              lastX = currentX + item.width
               
-              // Wrap text with styling tags
-              let styledText = text
-              
-              // Apply bold if detected
-              if (isBold && fontSize > 14) {
-                styledText = `<b style="font-size:${Math.round(fontSize)}px;">${styledText}</b>`
-              } else if (isBold) {
-                styledText = `<b>${styledText}</b>`
-              } else if (fontSize > 16) {
-                // Large text gets font-size
-                styledText = `<span style="font-size:${Math.round(fontSize)}px;">${styledText}</span>`
+              // Handle bold text grouping
+              if (isBold) {
+                if (!inBold) {
+                  inBold = true
+                  currentBoldText = text
+                } else {
+                  currentBoldText += text
+                }
+              } else {
+                // Close bold tag if we were in bold
+                if (inBold && currentBoldText) {
+                  fullText += `<b>${currentBoldText}</b>`
+                  currentBoldText = ''
+                  inBold = false
+                }
+                
+                // Add italic if needed
+                if (isItalic) {
+                  fullText += `<i>${text}</i>`
+                } else {
+                  fullText += text
+                }
               }
-              
-              // Apply italic if detected
-              if (isItalic) {
-                styledText = `<i>${styledText}</i>`
-              }
-              
-              fullText += styledText
+            }
+            
+            // Close any remaining bold at end of page
+            if (inBold && currentBoldText) {
+              fullText += `<b>${currentBoldText}</b>`
+              currentBoldText = ''
+              inBold = false
             }
             
             // Add page break
@@ -220,7 +259,14 @@ export default function Home() {
             }
           }
           
-          const jsonData = { content: fullText.trim() }
+          // Clean up the text - merge consecutive bold tags
+          fullText = fullText
+            .replace(/<\/b><b>/g, '')
+            .replace(/<\/i><i>/g, '')
+            .replace(/\\n\\n\\n+/g, '\\n\\n')
+            .trim()
+          
+          const jsonData = { content: '\\n' + fullText }
           setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
