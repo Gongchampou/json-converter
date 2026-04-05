@@ -114,33 +114,52 @@ export default function Home() {
         setConvertError(null)
         
         try {
-          // Load PDF.js from CDN dynamically
-          const PDFJS_VERSION = '4.0.379'
-          const pdfjsLib = (window as unknown as { pdfjsLib?: unknown }).pdfjsLib || await new Promise((resolve, reject) => {
-            // Check if already loaded
-            if ((window as unknown as { pdfjsLib?: unknown }).pdfjsLib) {
-              resolve((window as unknown as { pdfjsLib: unknown }).pdfjsLib)
-              return
+          // Load PDF.js from unpkg CDN dynamically (more reliable)
+          const PDFJS_VERSION = '3.11.174'
+          
+          // Define window type for PDF.js
+          type PDFJSWindow = Window & typeof globalThis & { 
+            pdfjsLib?: {
+              GlobalWorkerOptions: { workerSrc: string }
+              getDocument: (options: { data: ArrayBuffer }) => { 
+                promise: Promise<{
+                  numPages: number
+                  getPage: (num: number) => Promise<{
+                    getTextContent: () => Promise<{ items: Array<{ str?: string }> }>
+                  }>
+                }>
+              }
             }
-            
-            // Load the script
-            const script = document.createElement('script')
-            script.src = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
-            script.onload = () => {
-              const lib = (window as unknown as { pdfjsLib: { GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib
-              lib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`
-              resolve(lib)
-            }
-            script.onerror = () => reject(new Error('Failed to load PDF.js'))
-            document.head.appendChild(script)
-          })
+          }
+          
+          const win = window as PDFJSWindow
+          
+          // Load the library if not already loaded
+          if (!win.pdfjsLib) {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement('script')
+              script.src = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`
+              script.async = true
+              script.onload = () => {
+                if (win.pdfjsLib) {
+                  win.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`
+                  resolve()
+                } else {
+                  reject(new Error('PDF.js library not found after loading'))
+                }
+              }
+              script.onerror = () => reject(new Error('Failed to load PDF.js library'))
+              document.head.appendChild(script)
+            })
+          }
+          
+          const pdfjsLib = win.pdfjsLib!
           
           // Read file as ArrayBuffer
           const arrayBuffer = await file.arrayBuffer()
           
           // Load the PDF document
-          const pdfLib = pdfjsLib as { getDocument: (options: { data: ArrayBuffer }) => { promise: Promise<{ numPages: number; getPage: (num: number) => Promise<{ getTextContent: () => Promise<{ items: Array<{ str?: string }> }> }> }> } }
-          const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
           
           // Extract text from all pages
           let fullText = ''
@@ -169,6 +188,7 @@ export default function Home() {
           
           setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
+          console.log('[v0] PDF conversion error:', err)
           setConvertError(err instanceof Error ? err.message : 'Failed to convert PDF')
         } finally {
           setIsConverting(false)
