@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
-import { Code, Eye, Braces, Download, Upload, FileText, Loader2 } from "lucide-react"
+import { Code, Eye, Braces, Download, Upload, FileText, Loader2, FileType } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 const SAMPLE_JSON = `{
@@ -266,6 +266,79 @@ export default function Home() {
     input.click()
   }
 
+  const handleWordUpload = async () => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".docx"
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        setIsConverting(true)
+        setConvertError(null)
+        
+        try {
+          // Load mammoth.js dynamically from CDN
+          type MammothLib = {
+            convertToHtml: (options: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
+          }
+          
+          type MammothWindow = Window & typeof globalThis & { mammoth?: MammothLib }
+          const win = window as MammothWindow
+          
+          if (!win.mammoth) {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement('script')
+              script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
+              script.async = true
+              script.onload = () => {
+                if (win.mammoth) {
+                  resolve()
+                } else {
+                  reject(new Error('Mammoth.js library not found'))
+                }
+              }
+              script.onerror = () => reject(new Error('Failed to load Mammoth.js'))
+              document.head.appendChild(script)
+            })
+          }
+          
+          const mammoth = win.mammoth!
+          const arrayBuffer = await file.arrayBuffer()
+          
+          // Convert Word to HTML - mammoth preserves bold, italic, colors, etc.
+          const result = await mammoth.convertToHtml({ arrayBuffer })
+          let html = result.value
+          
+          // Convert HTML to simple format with \n for line breaks
+          // Replace paragraph and break tags with newlines
+          html = html
+            .replace(/<\/p><p>/g, '\n\n')
+            .replace(/<p>/g, '')
+            .replace(/<\/p>/g, '\n')
+            .replace(/<br\s*\/?>/g, '\n')
+            // Keep bold, italic, underline tags
+            .replace(/<strong>/g, '<b>')
+            .replace(/<\/strong>/g, '</b>')
+            .replace(/<em>/g, '<i>')
+            .replace(/<\/em>/g, '</i>')
+            // Remove other HTML tags but keep content
+            .replace(/<(?!\/?(b|i|u|font|span)[>\s])[^>]+>/g, '')
+            // Clean up extra newlines
+            .replace(/\n\n\n+/g, '\n\n')
+            .trim()
+          
+          const jsonData = { content: '\n' + html }
+          setJsonText(JSON.stringify(jsonData, null, 2))
+        } catch (err) {
+          setConvertError(err instanceof Error ? err.message : 'Failed to convert Word document')
+        } finally {
+          setIsConverting(false)
+        }
+      }
+    }
+    input.click()
+  }
+
   return (
     <div className="flex h-screen flex-col bg-background">
       {/* Header */}
@@ -305,6 +378,23 @@ export default function Home() {
               <>
                 <FileText className="size-3.5" />
                 PDF to JSON
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleWordUpload}
+            disabled={isConverting}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-blue-600 px-3 py-1.5 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isConverting ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                Converting...
+              </>
+            ) : (
+              <>
+                <FileType className="size-3.5" />
+                Word to JSON
               </>
             )}
           </button>
