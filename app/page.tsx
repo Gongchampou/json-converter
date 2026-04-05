@@ -555,12 +555,6 @@ export default function Home() {
 
         {/* Preview Panel */}
         <div className="flex min-h-0 flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
-            <Eye className="size-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">
-              Preview
-            </span>
-          </div>
           <div className="min-h-0 flex-1">
             <JsonPreview data={parsedJson} error={error} />
           </div>
