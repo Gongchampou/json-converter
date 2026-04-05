@@ -148,7 +148,7 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-4">
           {parsedJson !== undefined ? (
-            <span className="text-emerald-400">Valid</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Valid</span>
           ) : error ? (
             <span className="text-destructive">Invalid</span>
           ) : (

@@ -138,7 +138,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
               <Copy className="size-3.5" />
               Copy
             </span>
-            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
+            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
               <Check className="size-3.5" />
               Copied!
             </span>
