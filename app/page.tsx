@@ -323,12 +323,39 @@ export default function Home() {
           
           let fullText = ''
           
+          // Track current formatting state for grouping
+          let currentText = ''
+          let currentStyle = { bold: false, italic: false, underline: false, color: '' }
+          
+          // Helper to flush accumulated text with its formatting
+          const flushText = () => {
+            if (!currentText) return
+            
+            let formatted = currentText
+            
+            // Apply formatting only if different from default (no formatting)
+            if (currentStyle.color) {
+              formatted = `<font color="${currentStyle.color}">${formatted}</font>`
+            }
+            if (currentStyle.underline) {
+              formatted = `<u>${formatted}</u>`
+            }
+            if (currentStyle.italic) {
+              formatted = `<i>${formatted}</i>`
+            }
+            if (currentStyle.bold) {
+              formatted = `<b>${formatted}</b>`
+            }
+            
+            fullText += formatted
+            currentText = ''
+          }
+          
           // Get all paragraphs
           const paragraphs = xmlDoc.getElementsByTagName('w:p')
           
           for (let p = 0; p < paragraphs.length; p++) {
             const para = paragraphs[p]
-            let paraText = ''
             
             // Get all runs (text segments with formatting) in this paragraph
             const runs = para.getElementsByTagName('w:r')
@@ -354,18 +381,12 @@ export default function Home() {
               let color = ''
               
               if (rPr) {
-                // Check for bold
                 isBold = rPr.getElementsByTagName('w:b').length > 0 || 
                          rPr.getElementsByTagName('w:bCs').length > 0
-                
-                // Check for italic
                 isItalic = rPr.getElementsByTagName('w:i').length > 0 ||
                            rPr.getElementsByTagName('w:iCs').length > 0
-                
-                // Check for underline
                 isUnderline = rPr.getElementsByTagName('w:u').length > 0
                 
-                // Check for color
                 const colorEl = rPr.getElementsByTagName('w:color')[0]
                 if (colorEl) {
                   const colorVal = colorEl.getAttribute('w:val')
@@ -375,44 +396,31 @@ export default function Home() {
                 }
               }
               
-              // Build formatted text
-              let formattedText = text
+              // Check if formatting changed
+              const styleChanged = 
+                currentStyle.bold !== isBold ||
+                currentStyle.italic !== isItalic ||
+                currentStyle.underline !== isUnderline ||
+                currentStyle.color !== color
               
-              // Apply color first (innermost)
-              if (color) {
-                formattedText = `<font color="${color}">${formattedText}</font>`
+              if (styleChanged) {
+                // Flush previous text with old formatting
+                flushText()
+                // Update to new formatting
+                currentStyle = { bold: isBold, italic: isItalic, underline: isUnderline, color }
               }
               
-              // Apply underline
-              if (isUnderline) {
-                formattedText = `<u>${formattedText}</u>`
-              }
-              
-              // Apply italic
-              if (isItalic) {
-                formattedText = `<i>${formattedText}</i>`
-              }
-              
-              // Apply bold (outermost)
-              if (isBold) {
-                formattedText = `<b>${formattedText}</b>`
-              }
-              
-              paraText += formattedText
+              // Accumulate text
+              currentText += text
             }
             
-            if (paraText) {
-              fullText += paraText + '\n'
-            }
-            // Skip empty paragraphs - don't add extra line breaks
+            // Flush at end of paragraph and add newline
+            flushText()
+            fullText += '\n'
           }
           
-          // Clean up - merge consecutive tags and remove excess newlines
+          // Clean up excess newlines
           fullText = fullText
-            .replace(/<\/b><b>/g, '')
-            .replace(/<\/i><i>/g, '')
-            .replace(/<\/u><u>/g, '')
-            .replace(/<\/font><font color="([^"]+)">/g, '</font><font color="$1">')
             .replace(/\n\n+/g, '\n')
             .trim()
           
