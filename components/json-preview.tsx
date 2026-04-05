@@ -1,135 +1,117 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronRight, ChevronDown, Copy, Check } from "lucide-react"
+import { useState, useMemo } from "react"
+import { Copy, Check } from "lucide-react"
 
 interface JsonPreviewProps {
   data: unknown
   error?: string | null
 }
 
-function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-
-  if (value === null) {
-    return <span className="text-orange-400">null</span>
-  }
-
-  if (typeof value === "boolean") {
-    return <span className="text-orange-400">{value ? "true" : "false"}</span>
-  }
-
-  if (typeof value === "number") {
-    return <span className="text-emerald-400">{value}</span>
-  }
-
-  if (typeof value === "string") {
-    return <span className="text-amber-300">&quot;{value}&quot;</span>
-  }
-
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return <span className="text-foreground">{"[]"}</span>
+function highlightJson(json: string): React.ReactNode[] {
+  const lines = json.split("\n")
+  
+  return lines.map((line, lineIndex) => {
+    const tokens: React.ReactNode[] = []
+    let i = 0
+    let tokenIndex = 0
+    
+    while (i < line.length) {
+      // Match whitespace
+      const wsMatch = line.slice(i).match(/^(\s+)/)
+      if (wsMatch) {
+        tokens.push(<span key={tokenIndex++}>{wsMatch[1]}</span>)
+        i += wsMatch[1].length
+        continue
+      }
+      
+      // Match string (key or value)
+      const stringMatch = line.slice(i).match(/^"([^"\\]|\\.)*"/)
+      if (stringMatch) {
+        const str = stringMatch[0]
+        // Check if it's a key (followed by colon)
+        const afterString = line.slice(i + str.length)
+        if (afterString.match(/^\s*:/)) {
+          tokens.push(
+            <span key={tokenIndex++} className="text-sky-400">{str}</span>
+          )
+        } else {
+          tokens.push(
+            <span key={tokenIndex++} className="text-amber-300">{str}</span>
+          )
+        }
+        i += str.length
+        continue
+      }
+      
+      // Match number
+      const numMatch = line.slice(i).match(/^-?\d+\.?\d*([eE][+-]?\d+)?/)
+      if (numMatch) {
+        tokens.push(
+          <span key={tokenIndex++} className="text-emerald-400">{numMatch[0]}</span>
+        )
+        i += numMatch[0].length
+        continue
+      }
+      
+      // Match boolean and null
+      const boolNullMatch = line.slice(i).match(/^(true|false|null)/)
+      if (boolNullMatch) {
+        tokens.push(
+          <span key={tokenIndex++} className="text-orange-400">{boolNullMatch[0]}</span>
+        )
+        i += boolNullMatch[0].length
+        continue
+      }
+      
+      // Match brackets, braces, colons, commas
+      const punctMatch = line.slice(i).match(/^[{}\[\]:,]/)
+      if (punctMatch) {
+        tokens.push(
+          <span key={tokenIndex++} className="text-foreground">{punctMatch[0]}</span>
+        )
+        i += 1
+        continue
+      }
+      
+      // Fallback: single character
+      tokens.push(<span key={tokenIndex++}>{line[i]}</span>)
+      i++
     }
-
+    
     return (
-      <span>
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="inline-flex items-center text-muted-foreground hover:text-foreground"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="size-4" />
-          ) : (
-            <ChevronDown className="size-4" />
-          )}
-        </button>
-        <span className="text-foreground">[</span>
-        {isCollapsed ? (
-          <span className="text-muted-foreground">
-            {" "}
-            {value.length} items{" "}
-          </span>
-        ) : (
-          <>
-            {value.map((item, index) => (
-              <div key={index} style={{ paddingLeft: `${(depth + 1) * 20}px` }}>
-                <JsonValue value={item} depth={depth + 1} />
-                {index < value.length - 1 && (
-                  <span className="text-foreground">,</span>
-                )}
-              </div>
-            ))}
-          </>
-        )}
-        {!isCollapsed && (
-          <div style={{ paddingLeft: `${depth * 20}px` }}>
-            <span className="text-foreground">]</span>
-          </div>
-        )}
-        {isCollapsed && <span className="text-foreground">]</span>}
-      </span>
+      <div key={lineIndex} className="whitespace-pre">
+        {tokens.length > 0 ? tokens : " "}
+      </div>
     )
-  }
-
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-
-    if (entries.length === 0) {
-      return <span className="text-foreground">{"{}"}</span>
-    }
-
-    return (
-      <span>
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="inline-flex items-center text-muted-foreground hover:text-foreground"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="size-4" />
-          ) : (
-            <ChevronDown className="size-4" />
-          )}
-        </button>
-        <span className="text-foreground">{"{"}</span>
-        {isCollapsed ? (
-          <span className="text-muted-foreground">
-            {" "}
-            {entries.length} keys{" "}
-          </span>
-        ) : (
-          <>
-            {entries.map(([key, val], index) => (
-              <div key={key} style={{ paddingLeft: `${(depth + 1) * 20}px` }}>
-                <span className="text-sky-400">&quot;{key}&quot;</span>
-                <span className="text-foreground">: </span>
-                <JsonValue value={val} depth={depth + 1} />
-                {index < entries.length - 1 && (
-                  <span className="text-foreground">,</span>
-                )}
-              </div>
-            ))}
-          </>
-        )}
-        {!isCollapsed && (
-          <div style={{ paddingLeft: `${depth * 20}px` }}>
-            <span className="text-foreground">{"}"}</span>
-          </div>
-        )}
-        {isCollapsed && <span className="text-foreground">{"}"}</span>}
-      </span>
-    )
-  }
-
-  return <span className="text-foreground">{String(value)}</span>
+  })
 }
 
 export function JsonPreview({ data, error }: JsonPreviewProps) {
   const [copied, setCopied] = useState(false)
 
+  const formattedJson = useMemo(() => {
+    if (data === undefined) return ""
+    try {
+      return JSON.stringify(data, null, 2)
+    } catch {
+      return ""
+    }
+  }, [data])
+
+  const lines = useMemo(() => {
+    if (!formattedJson) return []
+    return formattedJson.split("\n")
+  }, [formattedJson])
+
+  const highlightedContent = useMemo(() => {
+    if (!formattedJson) return null
+    return highlightJson(formattedJson)
+  }, [formattedJson])
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+      await navigator.clipboard.writeText(formattedJson)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -167,9 +149,9 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-6">
+      <div className="flex-1 overflow-auto bg-card">
         {error ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="rounded-full bg-destructive/20 p-3">
               <svg
                 className="size-6 text-destructive"
@@ -191,11 +173,22 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
             </div>
           </div>
         ) : data === undefined ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
+          <div className="flex h-full items-center justify-center p-4 text-muted-foreground">
             Enter JSON in the editor to see preview
           </div>
         ) : (
-          <JsonValue value={data} />
+          <div className="flex h-full font-mono text-sm leading-6">
+            {/* Line numbers */}
+            <div className="sticky left-0 select-none border-r border-border bg-sidebar px-3 py-4 text-right text-muted-foreground">
+              {lines.map((_, index) => (
+                <div key={index}>{index + 1}</div>
+              ))}
+            </div>
+            {/* Code content */}
+            <div className="flex-1 overflow-x-auto p-4">
+              {highlightedContent}
+            </div>
+          </div>
         )}
       </div>
     </div>
