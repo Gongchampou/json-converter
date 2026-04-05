@@ -277,78 +277,147 @@ export default function Home() {
         setConvertError(null)
         
         try {
-          // Load mammoth.js dynamically from CDN
-          type MammothOptions = {
-            arrayBuffer: ArrayBuffer
-            styleMap?: string[]
-            includeDefaultStyleMap?: boolean
-            transformDocument?: (document: unknown) => unknown
+          // Load JSZip to extract docx (which is a zip file)
+          type JSZipLib = {
+            loadAsync: (data: ArrayBuffer) => Promise<{
+              file: (name: string) => { async: (type: string) => Promise<string> } | null
+            }>
           }
           
-          type MammothLib = {
-            convertToHtml: (options: MammothOptions) => Promise<{ value: string }>
-            extractRawText: (options: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
-          }
+          type JSZipWindow = Window & typeof globalThis & { JSZip?: new () => JSZipLib }
+          const win = window as JSZipWindow
           
-          type MammothWindow = Window & typeof globalThis & { mammoth?: MammothLib }
-          const win = window as MammothWindow
-          
-          if (!win.mammoth) {
+          if (!win.JSZip) {
             await new Promise<void>((resolve, reject) => {
               const script = document.createElement('script')
-              script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
+              script.src = 'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
               script.async = true
               script.onload = () => {
-                if (win.mammoth) {
+                if (win.JSZip) {
                   resolve()
                 } else {
-                  reject(new Error('Mammoth.js library not found'))
+                  reject(new Error('JSZip library not found'))
                 }
               }
-              script.onerror = () => reject(new Error('Failed to load Mammoth.js'))
+              script.onerror = () => reject(new Error('Failed to load JSZip'))
               document.head.appendChild(script)
             })
           }
           
-          const mammoth = win.mammoth!
+          const JSZip = win.JSZip!
+          const zip = new JSZip()
           const arrayBuffer = await file.arrayBuffer()
+          const zipContent = await zip.loadAsync(arrayBuffer)
           
-          // Convert Word to HTML with style mappings
-          const result = await mammoth.convertToHtml({ 
-            arrayBuffer,
-            styleMap: [
-              "b => b",
-              "i => i",
-              "u => u",
-              "strike => s",
-              "highlight => mark"
-            ]
-          })
-          let html = result.value
+          // Get the main document XML
+          const documentXml = zipContent.file('word/document.xml')
+          if (!documentXml) {
+            throw new Error('Invalid Word document')
+          }
           
-          // Convert HTML to simple format with \n for line breaks
-          html = html
-            // Handle paragraphs
-            .replace(/<\/p>\s*<p>/g, '\n\n')
-            .replace(/<p>/g, '')
-            .replace(/<\/p>/g, '\n')
-            .replace(/<br\s*\/?>/g, '\n')
-            // Convert strong/em to b/i
-            .replace(/<strong>/g, '<b>')
-            .replace(/<\/strong>/g, '</b>')
-            .replace(/<em>/g, '<i>')
-            .replace(/<\/em>/g, '</i>')
-            // Handle lists
-            .replace(/<li>/g, '• ')
-            .replace(/<\/li>/g, '\n')
-            .replace(/<\/?[ou]l>/g, '')
-            // Remove remaining HTML tags but keep b, i, u, font, span
-            .replace(/<(?!\/?(b|i|u|s|font|span|mark)[>\s])[^>]+>/g, '')
-            // Clean up whitespace
+          const xmlContent = await documentXml.async('string')
+          
+          // Parse XML to extract text with formatting
+          const parser = new DOMParser()
+          const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
+          
+          let fullText = ''
+          
+          // Get all paragraphs
+          const paragraphs = xmlDoc.getElementsByTagName('w:p')
+          
+          for (let p = 0; p < paragraphs.length; p++) {
+            const para = paragraphs[p]
+            let paraText = ''
+            
+            // Get all runs (text segments with formatting) in this paragraph
+            const runs = para.getElementsByTagName('w:r')
+            
+            for (let r = 0; r < runs.length; r++) {
+              const run = runs[r]
+              
+              // Get text content
+              const textNodes = run.getElementsByTagName('w:t')
+              let text = ''
+              for (let t = 0; t < textNodes.length; t++) {
+                text += textNodes[t].textContent || ''
+              }
+              
+              if (!text) continue
+              
+              // Get run properties for formatting
+              const rPr = run.getElementsByTagName('w:rPr')[0]
+              
+              let isBold = false
+              let isItalic = false
+              let isUnderline = false
+              let color = ''
+              
+              if (rPr) {
+                // Check for bold
+                isBold = rPr.getElementsByTagName('w:b').length > 0 || 
+                         rPr.getElementsByTagName('w:bCs').length > 0
+                
+                // Check for italic
+                isItalic = rPr.getElementsByTagName('w:i').length > 0 ||
+                           rPr.getElementsByTagName('w:iCs').length > 0
+                
+                // Check for underline
+                isUnderline = rPr.getElementsByTagName('w:u').length > 0
+                
+                // Check for color
+                const colorEl = rPr.getElementsByTagName('w:color')[0]
+                if (colorEl) {
+                  const colorVal = colorEl.getAttribute('w:val')
+                  if (colorVal && colorVal !== 'auto' && colorVal !== '000000') {
+                    color = '#' + colorVal
+                  }
+                }
+              }
+              
+              // Build formatted text
+              let formattedText = text
+              
+              // Apply color first (innermost)
+              if (color) {
+                formattedText = `<font color="${color}">${formattedText}</font>`
+              }
+              
+              // Apply underline
+              if (isUnderline) {
+                formattedText = `<u>${formattedText}</u>`
+              }
+              
+              // Apply italic
+              if (isItalic) {
+                formattedText = `<i>${formattedText}</i>`
+              }
+              
+              // Apply bold (outermost)
+              if (isBold) {
+                formattedText = `<b>${formattedText}</b>`
+              }
+              
+              paraText += formattedText
+            }
+            
+            if (paraText) {
+              fullText += paraText + '\n'
+            } else {
+              // Empty paragraph = extra line break
+              fullText += '\n'
+            }
+          }
+          
+          // Clean up
+          fullText = fullText
+            .replace(/<\/b><b>/g, '')
+            .replace(/<\/i><i>/g, '')
+            .replace(/<\/u><u>/g, '')
             .replace(/\n\n\n+/g, '\n\n')
-            .replace(/^\s+|\s+$/g, '')
+            .trim()
           
-          const jsonData = { content: '\n' + html }
+          const jsonData = { content: '\n' + fullText }
           setJsonText(JSON.stringify(jsonData, null, 2))
         } catch (err) {
           setConvertError(err instanceof Error ? err.message : 'Failed to convert Word document')
