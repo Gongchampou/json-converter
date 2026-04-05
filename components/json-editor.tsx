@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useRef, useEffect } from "react"
-import { Sparkles, Minimize2, Trash2 } from "lucide-react"
+import { useCallback, useRef, useEffect, useState } from "react"
+import { Sparkles, Minimize2, Trash2, Copy, Check } from "lucide-react"
 
 interface JsonEditorProps {
   value: string
@@ -12,6 +12,7 @@ interface JsonEditorProps {
 export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
 
   const lines = value.split("\n")
   const lineCount = lines.length
@@ -47,9 +48,22 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
   const handleBeautify = () => {
     try {
       const parsed = JSON.parse(value)
-      onChange(JSON.stringify(parsed, null, 2))
+      // Format with 2 spaces and ensure brackets are on separate lines for easy editing
+      const beautified = JSON.stringify(parsed, null, 2)
+      onChange(beautified)
     } catch {
       // Can't beautify invalid JSON
+    }
+  }
+
+  const handleCopy = async () => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Copy failed
     }
   }
 
@@ -104,6 +118,21 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           >
             <Minimize2 className="size-3.5" />
             Minify
+          </button>
+          <button
+            onClick={handleCopy}
+            disabled={!value}
+            title="Copy to clipboard"
+            className="relative flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span className={`flex items-center gap-1.5 transition-all duration-200 ${copied ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}>
+              <Copy className="size-3.5" />
+              Copy
+            </span>
+            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
+              <Check className="size-3.5" />
+              Copied!
+            </span>
           </button>
           <button
             onClick={handleClear}
