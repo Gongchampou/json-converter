@@ -44,8 +44,8 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border bg-sidebar px-4 py-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
           <div className="flex size-3 items-center justify-center rounded-full bg-[#ff5f56]" />
           <div className="flex size-3 items-center justify-center rounded-full bg-[#ffbd2e]" />
@@ -58,7 +58,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           </span>
         )}
       </div>
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1">
         <div
           ref={lineNumbersRef}
           className="w-12 shrink-0 overflow-hidden border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
@@ -75,7 +75,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           spellCheck={false}
-          className="flex-1 resize-none bg-card p-4 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Enter your JSON here..."
         />
       </div>

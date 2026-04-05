@@ -218,8 +218,8 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border bg-sidebar px-4 py-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 py-2">
         <div className="flex items-center gap-2">
           <FileText className="size-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Document Preview</span>
@@ -248,7 +248,7 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="rounded-full bg-destructive/20 p-3">
@@ -296,7 +296,7 @@ export function JsonPreview({ data, error }: JsonPreviewProps) {
             </div>
           </div>
         ) : (
-          <div className="bg-card">
+          <div className="min-h-0 bg-card">
             {/* Document container - like a PDF page */}
             <div className="mx-auto max-w-3xl p-8">
               <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
