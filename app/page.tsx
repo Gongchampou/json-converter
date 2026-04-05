@@ -34,12 +34,37 @@ export default function Home() {
       return { parsedJson: undefined, error: null }
     }
     try {
+      // First try standard JSON parse
       const parsed = JSON.parse(jsonText)
       return { parsedJson: parsed, error: null }
     } catch (e) {
-      return {
-        parsedJson: undefined,
-        error: e instanceof Error ? e.message : "Invalid JSON",
+      // If standard parse fails, try to fix common issues like unescaped newlines in strings
+      try {
+        // Replace actual newlines inside JSON strings with \n escape sequences
+        // This regex finds strings and replaces newlines within them
+        let fixedJson = jsonText
+        
+        // Convert actual newlines inside strings to \n escape sequences
+        // Match content between quotes, handling escaped quotes
+        fixedJson = fixedJson.replace(
+          /"([^"\\]|\\.)*"/g,
+          (match) => {
+            // Replace actual newlines with \n escape sequence
+            return match
+              .replace(/\r\n/g, '\\n')
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\n')
+          }
+        )
+        
+        const parsed = JSON.parse(fixedJson)
+        return { parsedJson: parsed, error: null }
+      } catch {
+        // If still fails, return original error
+        return {
+          parsedJson: undefined,
+          error: e instanceof Error ? e.message : "Invalid JSON",
+        }
       }
     }
   }, [jsonText])
