@@ -403,18 +403,17 @@ export default function Home() {
             
             if (paraText) {
               fullText += paraText + '\n'
-            } else {
-              // Empty paragraph = extra line break
-              fullText += '\n'
             }
+            // Skip empty paragraphs - don't add extra line breaks
           }
           
-          // Clean up
+          // Clean up - merge consecutive tags and remove excess newlines
           fullText = fullText
             .replace(/<\/b><b>/g, '')
             .replace(/<\/i><i>/g, '')
             .replace(/<\/u><u>/g, '')
-            .replace(/\n\n\n+/g, '\n\n')
+            .replace(/<\/font><font color="([^"]+)">/g, '</font><font color="$1">')
+            .replace(/\n\n+/g, '\n')
             .trim()
           
           const jsonData = { content: '\n' + fullText }
