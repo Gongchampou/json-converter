@@ -101,8 +101,8 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
         {value && (
           <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
             isValidJson 
-              ? "bg-emerald-500/20 text-emerald-400" 
-              : "bg-red-500/20 text-red-400"
+              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+              : "bg-red-500/20 text-red-600 dark:text-red-400"
           }`}>
             {isValidJson ? "Valid" : "Invalid"}
           </span>
@@ -176,7 +176,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           onKeyDown={handleKeyDown}
           spellCheck={false}
           className={`min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
-            !value ? "text-foreground" : isValidJson ? "text-emerald-400" : "text-red-400"
+            !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
           }`}
           placeholder="Enter your JSON here..."
         />
