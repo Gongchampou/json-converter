@@ -161,7 +161,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
       <div className="relative flex min-h-0 flex-1">
         <div
           ref={lineNumbersRef}
-          className="w-12 shrink-0 overflow-hidden border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
+          className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
         >
           {Array.from({ length: lineCount }, (_, i) => (
             <div key={i + 1} className="px-2">
