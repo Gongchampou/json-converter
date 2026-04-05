@@ -40,7 +40,6 @@ export default function Home() {
 
   // Callback when text is selected in the editor
   const handleEditorSelection = useCallback((selectedText: string) => {
-    console.log("[v0] handleEditorSelection called with:", selectedText)
     setEditorSelectedText(selectedText || null)
     // Clear the preview-to-editor highlight when selecting in editor
     if (selectedText) {

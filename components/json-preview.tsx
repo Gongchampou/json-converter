@@ -37,8 +37,6 @@ function HighlightedHtml({ html }: { html: string }) {
 function HighlightedText({ text }: { text: string }) {
   const highlightText = useContext(HighlightContext)
   
-  console.log("[v0] HighlightedText - highlightText:", highlightText, "text:", text?.substring(0, 30))
-  
   if (!highlightText || highlightText.length < 2) {
     return <>{text}</>
   }
@@ -390,7 +388,6 @@ export function JsonPreview({ data, error, onSelection, highlightText }: JsonPre
   {/* Document container - like a PDF page */}
   <div className="mx-auto max-w-3xl">
   <div className="rounded-xl border border-border bg-background p-6 shadow-lg">
-{console.log("[v0] JsonPreview highlightText prop:", highlightText)}
 <HighlightContext.Provider value={highlightText || null}>
   <RenderValue value={data} />
 </HighlightContext.Provider>

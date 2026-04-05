@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useEffect, useState, useMemo } from "react"
+import { useCallback, useRef, useEffect, useState, useMemo, useLayoutEffect } from "react"
 import { Sparkles, Minimize2, Trash2, Copy, Check } from "lucide-react"
 import type { HighlightRange } from "@/app/page"
 
@@ -16,10 +16,44 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
+  const [lineHeights, setLineHeights] = useState<number[]>([])
 
   const lines = value.split("\n")
   const lineCount = lines.length
+
+  // Measure the actual rendered height of each line (accounting for wrapping)
+  const measureLineHeights = useCallback(() => {
+    if (!measureRef.current) return
+    
+    const measureDiv = measureRef.current
+    const children = measureDiv.children
+    const heights: number[] = []
+    
+    for (let i = 0; i < children.length; i++) {
+      heights.push((children[i] as HTMLElement).offsetHeight)
+    }
+    
+    setLineHeights(heights)
+  }, [])
+
+  useLayoutEffect(() => {
+    measureLineHeights()
+  }, [value, lines.length, measureLineHeights])
+
+  // Re-measure on resize
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver(() => {
+      measureLineHeights()
+    })
+    
+    if (measureRef.current) {
+      resizeObserver.observe(measureRef.current)
+    }
+    
+    return () => resizeObserver.disconnect()
+  }, [measureLineHeights])
 
   // Calculate per-line highlight ranges (start/end within each line)
   const lineHighlights = useMemo(() => {
@@ -75,6 +109,10 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
       highlightRef.current.scrollTop = textareaRef.current.scrollTop
       highlightRef.current.scrollLeft = textareaRef.current.scrollLeft
     }
+    if (textareaRef.current && measureRef.current) {
+      measureRef.current.scrollTop = textareaRef.current.scrollTop
+      measureRef.current.scrollLeft = textareaRef.current.scrollLeft
+    }
   }, [])
 
   useEffect(() => {
@@ -87,29 +125,19 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
 
   // Handle text selection in the editor
   const handleTextSelect = useCallback(() => {
-    console.log("[v0] handleTextSelect called, onSelection exists:", !!onSelection)
     // Use setTimeout to ensure the selection is complete
     setTimeout(() => {
       const textarea = textareaRef.current
-      if (!textarea) {
-        console.log("[v0] textarea ref is null")
-        return
-      }
+      if (!textarea) return
       
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
-      console.log("[v0] Selection range:", start, end)
       
       if (start !== end) {
         const selectedText = value.substring(start, end).trim()
-        console.log("[v0] Editor selection from textarea:", selectedText)
-        if (onSelection) {
-          onSelection(selectedText)
-        } else {
-          console.log("[v0] WARNING: onSelection is undefined!")
-        }
+        onSelection?.(selectedText)
       }
-    }, 10) // Increased timeout for reliability
+    }, 10)
   }, [onSelection, value])
 
   // Clear selection when clicking outside the textarea
@@ -254,15 +282,31 @@ export function JsonEditor({ value, onChange, error, highlightRange, onSelection
       <div className="relative flex min-h-0 flex-1">
         <div
           ref={lineNumbersRef}
-          className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs leading-6 text-muted-foreground"
+          className="w-16 shrink-0 overflow-y-auto border-r border-border bg-sidebar py-4 text-right font-mono text-xs text-muted-foreground"
         >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className={`px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}>
-              {i + 1}
+          {lines.map((_, i) => (
+            <div 
+              key={i + 1} 
+              className={`flex items-start justify-end px-2 ${lineHighlights.has(i) ? "bg-yellow-500/20" : ""}`}
+              style={{ height: lineHeights[i] || 24 }}
+            >
+              <span className="leading-6">{i + 1}</span>
             </div>
           ))}
         </div>
         <div className="relative min-h-0 flex-1 bg-card">
+          {/* Hidden measurement div - measures actual line heights including wrapping */}
+          <div
+            ref={measureRef}
+            className="pointer-events-none invisible absolute inset-0 overflow-hidden p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap"
+            aria-hidden="true"
+          >
+            {lines.map((line, i) => (
+              <div key={i} className="whitespace-pre-wrap break-words">
+                {line || "\u00A0"}
+              </div>
+            ))}
+          </div>
           {/* Highlight overlay - shows underlines for selected text */}
           <div
             ref={highlightRef}
