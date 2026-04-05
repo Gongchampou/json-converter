@@ -44,19 +44,60 @@ export default function Home() {
       return
     }
     
-    // Find the selected text in the JSON source
-    const start = jsonText.indexOf(selectedText)
-    if (start !== -1) {
-      setHighlightRange({ start, end: start + selectedText.length })
-    } else {
-      // Try to find escaped version (for content that might have \n in source)
+    console.log("[v0] Selected text in preview:", selectedText)
+    
+    // Try multiple matching strategies
+    let start = -1
+    let matchLength = selectedText.length
+    
+    // Strategy 1: Direct match
+    start = jsonText.indexOf(selectedText)
+    console.log("[v0] Strategy 1 (direct):", start)
+    
+    // Strategy 2: Try with escaped newlines (for content that might have \n in source)
+    if (start === -1) {
       const escapedText = selectedText.replace(/\n/g, '\\n')
-      const escapedStart = jsonText.indexOf(escapedText)
-      if (escapedStart !== -1) {
-        setHighlightRange({ start: escapedStart, end: escapedStart + escapedText.length })
-      } else {
-        setHighlightRange(null)
+      start = jsonText.indexOf(escapedText)
+      if (start !== -1) {
+        matchLength = escapedText.length
       }
+      console.log("[v0] Strategy 2 (escaped newlines):", start)
+    }
+    
+    // Strategy 3: Try wrapping in quotes (for JSON string values)
+    if (start === -1) {
+      const quotedText = `"${selectedText}"`
+      const quotedStart = jsonText.indexOf(quotedText)
+      if (quotedStart !== -1) {
+        start = quotedStart
+        matchLength = quotedText.length
+      }
+      console.log("[v0] Strategy 3 (quoted):", start)
+    }
+    
+    // Strategy 4: Search for partial matches in JSON values
+    if (start === -1) {
+      // Look for the selected text as part of a JSON string value
+      const regex = new RegExp(`"[^"]*${selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"`)
+      const match = jsonText.match(regex)
+      if (match && match.index !== undefined) {
+        // Find where the selected text starts within the matched string
+        const matchedStr = match[0]
+        const innerStart = matchedStr.indexOf(selectedText)
+        if (innerStart !== -1) {
+          start = match.index + innerStart
+          matchLength = selectedText.length
+        }
+      }
+      console.log("[v0] Strategy 4 (partial in value):", start)
+    }
+    
+    if (start !== -1) {
+      console.log("[v0] Found match at:", start, "length:", matchLength)
+      setHighlightRange({ start, end: start + matchLength })
+    } else {
+      console.log("[v0] No match found")
+      setHighlightRange(null)
     }
   }, [jsonText])
 
