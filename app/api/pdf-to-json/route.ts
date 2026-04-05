@@ -1,10 +1,8 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 
-// Simple schema with just content field
-const documentSchema = z.object({
-  content: z.string().describe('All extracted text from the PDF document'),
-})
+// Flexible schema for any document type
+const documentSchema = z.record(z.string(), z.unknown()).describe('Extracted document data as key-value pairs')
 
 export async function POST(req: Request) {
   try {
@@ -21,16 +19,18 @@ export async function POST(req: Request) {
           content: [
             {
               type: 'text',
-              text: `Extract ALL text content from this PDF document and return it in a single "content" field.
-
+              text: `Extract ALL text content from this PDF document and convert it to a well-structured JSON format. 
+              
 Rules:
-- Extract ALL text from the PDF exactly as it appears
-- Keep all text content, don't summarize or skip anything
-- For styled text (bold, italic, colored), preserve using HTML tags like <b>, <i>, <b style="color:red;">
-- For line breaks between paragraphs or sections, use \\n
-- For double line breaks (new paragraphs), use \\n\\n
-- Return everything in one single "content" string field
-- Do NOT create multiple keys - only use "content"`,
+- Preserve the document structure (headings, paragraphs, lists, tables)
+- If there are sections, use section names as keys
+- If there are lists, use arrays
+- If there are tables, convert to arrays of objects
+- Keep all text content, don't summarize
+- Use descriptive key names based on the content
+- For styled text (bold, italic), preserve using HTML tags like <b>, <i>
+- For line breaks in content, use \\n
+- Return a clean, well-organized JSON structure`,
             },
             {
               type: 'file',

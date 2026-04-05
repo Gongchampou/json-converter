@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useEffect, useState, useMemo } from "react"
+import { useCallback, useRef, useEffect, useState } from "react"
 import { Sparkles, Minimize2, Trash2, Copy, Check } from "lucide-react"
 
 interface JsonEditorProps {
@@ -9,78 +9,17 @@ interface JsonEditorProps {
   error?: string | null
 }
 
-// Syntax highlighting function for JSON
-function highlightJson(code: string): string {
-  if (!code) return ""
-  
-  // Escape HTML first
-  let highlighted = code
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-  
-  // Highlight strings (keys and values)
-  highlighted = highlighted.replace(
-    /"([^"\\]|\\.)*"/g,
-    (match) => {
-      // Check if it's a key (followed by :)
-      return `<span class="json-string">${match}</span>`
-    }
-  )
-  
-  // Highlight numbers
-  highlighted = highlighted.replace(
-    /\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g,
-    '<span class="json-number">$1</span>'
-  )
-  
-  // Highlight booleans
-  highlighted = highlighted.replace(
-    /\b(true|false)\b/g,
-    '<span class="json-boolean">$1</span>'
-  )
-  
-  // Highlight null
-  highlighted = highlighted.replace(
-    /\bnull\b/g,
-    '<span class="json-null">null</span>'
-  )
-  
-  // Highlight brackets and braces
-  highlighted = highlighted.replace(
-    /([{}\[\]])/g,
-    '<span class="json-bracket">$1</span>'
-  )
-  
-  // Highlight colons and commas
-  highlighted = highlighted.replace(
-    /(:)/g,
-    '<span class="json-punctuation">$1</span>'
-  )
-  
-  return highlighted
-}
-
 export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
-  const highlightRef = useRef<HTMLPreElement>(null)
   const [copied, setCopied] = useState(false)
 
   const lines = value.split("\n")
   const lineCount = lines.length
-  
-  const highlightedCode = useMemo(() => highlightJson(value), [value])
 
   const handleScroll = useCallback(() => {
-    if (textareaRef.current) {
-      if (lineNumbersRef.current) {
-        lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop
-      }
-      if (highlightRef.current) {
-        highlightRef.current.scrollTop = textareaRef.current.scrollTop
-        highlightRef.current.scrollLeft = textareaRef.current.scrollLeft
-      }
+    if (textareaRef.current && lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop
     }
   }, [])
 
@@ -159,6 +98,15 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
           <div className="flex size-3 items-center justify-center rounded-full bg-[#27c93f]" />
         </div>
         <span className="ml-4 text-sm text-muted-foreground">editor.json</span>
+        {value && (
+          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+            isValidJson 
+              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+              : "bg-red-500/20 text-red-600 dark:text-red-400"
+          }`}>
+            {isValidJson ? "Valid" : "Invalid"}
+          </span>
+        )}
         
         {/* Editor action buttons */}
         <div className="ml-auto flex items-center gap-1.5">
@@ -190,7 +138,7 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
               <Copy className="size-3.5" />
               Copy
             </span>
-            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
+            <span className={`absolute inset-0 flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 transition-all duration-200 ${copied ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}>
               <Check className="size-3.5" />
               Copied!
             </span>
@@ -221,25 +169,17 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
             </div>
           ))}
         </div>
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          {/* Syntax highlighted background */}
-          <pre
-            ref={highlightRef}
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words bg-card p-4 font-mono text-sm leading-6 [&_.json-boolean]:text-orange-400 [&_.json-bracket]:text-muted-foreground [&_.json-null]:text-orange-400 [&_.json-number]:text-emerald-400 [&_.json-punctuation]:text-muted-foreground [&_.json-string]:text-sky-400"
-            dangerouslySetInnerHTML={{ __html: highlightedCode || "&nbsp;" }}
-          />
-          {/* Transparent textarea for editing */}
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            spellCheck={false}
-            className="relative z-10 min-h-full w-full resize-none overflow-y-auto bg-transparent p-4 font-mono text-sm leading-6 text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
-            placeholder="Enter your JSON here..."
-          />
-        </div>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          spellCheck={false}
+          className={`min-h-0 flex-1 resize-none overflow-y-auto bg-card p-4 font-mono text-sm leading-6 outline-none placeholder:text-muted-foreground ${
+            !value ? "text-foreground" : isValidJson ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+          }`}
+          placeholder="Enter your JSON here..."
+        />
       </div>
     </div>
   )
