@@ -45,7 +45,7 @@ export default function Home() {
     }
     
     // Escape the selected text to match JSON source format
-    // In JSON, newlines are stored as \n, tabs as \t, etc.
+    // In JSON, newlines are stored as \n (literal backslash + n), tabs as \t, etc.
     const escapeForJson = (text: string) => {
       return text
         .replace(/\\/g, '\\\\')
@@ -60,7 +60,7 @@ export default function Home() {
     let start = -1
     let matchLength = 0
     
-    // Strategy 1: Direct match (works for keys, numbers, etc.)
+    // Strategy 1: Direct match (works for keys, numbers, booleans, etc.)
     start = jsonText.indexOf(selectedText)
     if (start !== -1) {
       matchLength = selectedText.length
@@ -85,19 +85,18 @@ export default function Home() {
       }
     }
     
-    // Strategy 4: Search for partial matches within JSON string values
+    // Strategy 4: Search for partial matches - scan through all string values in JSON
     if (start === -1) {
-      // Build a regex to find the escaped text within a JSON string
-      const escapedForRegex = escapedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const regex = new RegExp(`"[^"]*?(${escapedForRegex})[^"]*?"`)
-      const match = jsonText.match(regex)
-      if (match && match.index !== undefined && match[1]) {
-        // Find exact position of our text within the matched string
-        const fullMatch = match[0]
-        const innerIndex = fullMatch.indexOf(escapedText)
-        if (innerIndex !== -1) {
-          start = match.index + innerIndex
+      // Find all JSON string values and search within each
+      const stringValueRegex = /"(?:[^"\\]|\\.)*"/g
+      let match
+      while ((match = stringValueRegex.exec(jsonText)) !== null) {
+        const stringContent = match[0].slice(1, -1) // Remove surrounding quotes
+        const indexInString = stringContent.indexOf(escapedText)
+        if (indexInString !== -1) {
+          start = match.index + 1 + indexInString // +1 for opening quote
           matchLength = escapedText.length
+          break
         }
       }
     }
