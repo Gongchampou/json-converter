@@ -548,7 +548,7 @@ export default function Home() {
       <main className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
         {/* Editor Panel */}
         <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
             <Code className="size-4 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Editor</span>
           </div>
@@ -559,7 +559,7 @@ export default function Home() {
 
         {/* Preview Panel */}
         <div className="flex min-h-0 flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
             <Eye className="size-4 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">
               Preview
