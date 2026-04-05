@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { JsonEditor } from "@/components/json-editor"
 import { JsonPreview } from "@/components/json-preview"
 import { Code, Eye, Braces, Download, Upload } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const SAMPLE_JSON = `{
   "name": "JSON Editor",
@@ -108,6 +109,7 @@ export default function Home() {
             <Download className="size-3.5" />
             Download
           </button>
+          <ThemeToggle />
         </div>
       </header>
 
